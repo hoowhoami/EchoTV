@@ -1,0 +1,11 @@
+dependencies {
+    api project(':openai-proxy-common:openai-proxy-common-core')
+}
+
+bootJar {
+    enabled = false
+}
+
+jar {
+    enabled = true
+}

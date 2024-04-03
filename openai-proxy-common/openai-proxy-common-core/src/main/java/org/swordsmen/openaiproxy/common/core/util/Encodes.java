@@ -1,0 +1,428 @@
+package org.swordsmen.openaiproxy.common.core.util;
+
+import lombok.SneakyThrows;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * @author JLT
+ * Create by 2024/4/3
+ */
+public class Encodes {
+
+    public static final String ENCODE_UTF_8 = "UTF-8";
+
+    public static final String TEXT_FILE_SUFFIX = ".txt";
+    public static final String MD_FILE_SUFFIX = ".md";
+    public static final String PDF_FILE_SUFFIX = ".pdf";
+    public static final String WORD_FILE_SUFFIX = ".word";
+    public static final String EXCEL_FILE_SUFFIX = ".xlsx";
+    public static final String TS_FILE_SUFFIX = ".ts";
+    public static final Set<String> TEXT_FILE_SET = new HashSet<>();
+
+    static {
+        TEXT_FILE_SET.add(TEXT_FILE_SUFFIX);
+        TEXT_FILE_SET.add(MD_FILE_SUFFIX);
+        TEXT_FILE_SET.add(PDF_FILE_SUFFIX);
+        TEXT_FILE_SET.add(WORD_FILE_SUFFIX);
+        TEXT_FILE_SET.add(EXCEL_FILE_SUFFIX);
+        TEXT_FILE_SET.add(TS_FILE_SUFFIX);
+    }
+
+    public static Set<String> TEXT_CONTENT_TYPE = new HashSet<>();
+    public static Map<String, String> TEXT_CONTENT_TYPE_MAP = new HashMap<>();
+
+    public static Map<String, String> SUFFIX_MAP = new HashMap<>();
+
+    static {
+        TEXT_CONTENT_TYPE.add("text/html");
+        TEXT_CONTENT_TYPE.add("text/html;charset=utf-8");
+        TEXT_CONTENT_TYPE.add("text/plain");
+        TEXT_CONTENT_TYPE.add("text/plain;charset=utf-8");
+        TEXT_CONTENT_TYPE.add("application/javascript");
+
+        TEXT_CONTENT_TYPE_MAP.put("text/html", ".html");
+        TEXT_CONTENT_TYPE_MAP.put("text/html;charset=utf-8", ".html");
+        TEXT_CONTENT_TYPE_MAP.put("text/plain", ".txt");
+        TEXT_CONTENT_TYPE_MAP.put("text/plain;charset=utf-8", ".txt");
+        TEXT_CONTENT_TYPE_MAP.put("application/javascript", ".js");
+
+
+        SUFFIX_MAP.put("image/tiff", ".tif");
+        SUFFIX_MAP.put("application/x-001", ".001");
+        SUFFIX_MAP.put("application/x-301", ".301");
+        SUFFIX_MAP.put("text/h323", ".323");
+        SUFFIX_MAP.put("application/x-906", ".906");
+        SUFFIX_MAP.put("drawing/907", ".907");
+        SUFFIX_MAP.put("application/x-a11", ".a11");
+        SUFFIX_MAP.put("audio/x-mei-aac", ".acp");
+        SUFFIX_MAP.put("application/postscript", ".ai");
+        SUFFIX_MAP.put("audio/aiff", ".aif");
+        SUFFIX_MAP.put("audio/aiff", ".aifc");
+        SUFFIX_MAP.put("audio/aiff", ".aiff");
+        SUFFIX_MAP.put("application/x-anv", ".anv");
+        SUFFIX_MAP.put("text/asa", ".asa");
+        SUFFIX_MAP.put("video/x-ms-asf", ".asf");
+        SUFFIX_MAP.put("text/asp", ".asp");
+        SUFFIX_MAP.put("video/x-ms-asf", ".asx");
+        SUFFIX_MAP.put("audio/basic", ".au");
+        SUFFIX_MAP.put("video/avi", ".avi");
+        SUFFIX_MAP.put("application/vnd.adobe.workflow", ".awf");
+        SUFFIX_MAP.put("text/xml", ".biz");
+        SUFFIX_MAP.put("application/x-bmp", ".bmp");
+        SUFFIX_MAP.put("application/x-bot", ".bot");
+        SUFFIX_MAP.put("application/x-c4t", ".c4t");
+        SUFFIX_MAP.put("application/x-c90", ".c90");
+        SUFFIX_MAP.put("application/x-cals", ".cal");
+        SUFFIX_MAP.put("application/vnd.ms-pki.seccat", ".cat");
+        SUFFIX_MAP.put("application/x-netcdf", ".cdf");
+        SUFFIX_MAP.put("application/x-cdr", ".cdr");
+        SUFFIX_MAP.put("application/x-cel", ".cel");
+        SUFFIX_MAP.put("application/x-x509-ca-cert", ".cer");
+        SUFFIX_MAP.put("application/x-g4", ".cg4");
+        SUFFIX_MAP.put("application/x-cgm", ".cgm");
+        SUFFIX_MAP.put("application/x-cit", ".cit");
+        SUFFIX_MAP.put("java/*", ".class");
+        SUFFIX_MAP.put("text/xml", ".cml");
+        SUFFIX_MAP.put("application/x-cmp", ".cmp");
+        SUFFIX_MAP.put("application/x-cmx", ".cmx");
+        SUFFIX_MAP.put("application/x-cot", ".cot");
+        SUFFIX_MAP.put("application/pkix-crl", ".crl");
+        SUFFIX_MAP.put("application/x-x509-ca-cert", ".crt");
+        SUFFIX_MAP.put("application/x-csi", ".csi");
+        SUFFIX_MAP.put("text/css", ".css");
+        SUFFIX_MAP.put("application/x-cut", ".cut");
+        SUFFIX_MAP.put("application/x-dbf", ".dbf");
+        SUFFIX_MAP.put("application/x-dbm", ".dbm");
+        SUFFIX_MAP.put("application/x-dbx", ".dbx");
+        SUFFIX_MAP.put("text/xml", ".dcd");
+        SUFFIX_MAP.put("application/x-dcx", ".dcx");
+        SUFFIX_MAP.put("application/x-x509-ca-cert", ".der");
+        SUFFIX_MAP.put("application/x-dgn", ".dgn");
+        SUFFIX_MAP.put("application/x-dib", ".dib");
+        SUFFIX_MAP.put("application/x-msdownload", ".dll");
+        SUFFIX_MAP.put("application/msword", ".doc");
+        SUFFIX_MAP.put("application/msword", ".dot");
+        SUFFIX_MAP.put("application/x-drw", ".drw");
+        SUFFIX_MAP.put("text/xml", ".dtd");
+        SUFFIX_MAP.put("Model/vnd.dwf", ".dwf");
+        SUFFIX_MAP.put("application/x-dwf", ".dwf");
+        SUFFIX_MAP.put("application/x-dwg", ".dwg");
+        SUFFIX_MAP.put("application/x-dxb", ".dxb");
+        SUFFIX_MAP.put("application/x-dxf", ".dxf");
+        SUFFIX_MAP.put("application/vnd.adobe.edn", ".edn");
+        SUFFIX_MAP.put("application/x-emf", ".emf");
+        SUFFIX_MAP.put("message/rfc822", ".eml");
+        SUFFIX_MAP.put("text/xml", ".ent");
+        SUFFIX_MAP.put("application/x-epi", ".epi");
+        SUFFIX_MAP.put("application/x-ps", ".eps");
+        SUFFIX_MAP.put("application/postscript", ".eps");
+        SUFFIX_MAP.put("application/x-ebx", ".etd");
+        SUFFIX_MAP.put("application/x-msdownload", ".exe");
+        SUFFIX_MAP.put("image/fax", ".fax");
+        SUFFIX_MAP.put("application/vnd.fdf", ".fdf");
+        SUFFIX_MAP.put("application/fractals", ".fif");
+        SUFFIX_MAP.put("text/xml", ".fo");
+        SUFFIX_MAP.put("application/x-frm", ".frm");
+        SUFFIX_MAP.put("application/x-g4", ".g4");
+        SUFFIX_MAP.put("application/x-gbr", ".gbr");
+        SUFFIX_MAP.put("application/x-", ".");
+        SUFFIX_MAP.put("image/gif", ".gif");
+        SUFFIX_MAP.put("application/x-gl2", ".gl2");
+        SUFFIX_MAP.put("application/x-gp4", ".gp4");
+        SUFFIX_MAP.put("application/x-hgl", ".hgl");
+        SUFFIX_MAP.put("application/x-hmr", ".hmr");
+        SUFFIX_MAP.put("application/x-hpgl", ".hpg");
+        SUFFIX_MAP.put("application/x-hpl", ".hpl");
+        SUFFIX_MAP.put("application/mac-binhex40", ".hqx");
+        SUFFIX_MAP.put("application/x-hrf", ".hrf");
+        SUFFIX_MAP.put("application/hta", ".hta");
+        SUFFIX_MAP.put("text/x-component", ".htc");
+        SUFFIX_MAP.put("text/html", ".htm");
+        SUFFIX_MAP.put("text/html", ".html");
+        SUFFIX_MAP.put("text/webviewhtml", ".htt");
+        SUFFIX_MAP.put("text/html", ".htx");
+        SUFFIX_MAP.put("application/x-icb", ".icb");
+        SUFFIX_MAP.put("image/x-icon", ".ico");
+        SUFFIX_MAP.put("application/x-ico", ".ico");
+        SUFFIX_MAP.put("application/x-iff", ".iff");
+        SUFFIX_MAP.put("application/x-g4", ".ig4");
+        SUFFIX_MAP.put("application/x-igs", ".igs");
+        SUFFIX_MAP.put("application/x-iphone", ".iii");
+        SUFFIX_MAP.put("application/x-img", ".img");
+        SUFFIX_MAP.put("application/x-internet-signup", ".ins");
+        SUFFIX_MAP.put("application/x-internet-signup", ".isp");
+        SUFFIX_MAP.put("video/x-ivf", ".IVF");
+        SUFFIX_MAP.put("java/*", ".java");
+        SUFFIX_MAP.put("image/jpeg", ".jfif");
+        SUFFIX_MAP.put("image/jpeg", ".jpe");
+        SUFFIX_MAP.put("application/x-jpe", ".jpe");
+        SUFFIX_MAP.put("image/jpeg", ".jpeg");
+        SUFFIX_MAP.put("image/jpeg", ".jpg");
+        SUFFIX_MAP.put("application/x-jpg", ".jpg");
+        SUFFIX_MAP.put("application/x-javascript", ".js");
+        SUFFIX_MAP.put("text/html", ".jsp");
+        SUFFIX_MAP.put("audio/x-liquid-file", ".la1");
+        SUFFIX_MAP.put("application/x-laplayer-reg", ".lar");
+        SUFFIX_MAP.put("application/x-latex", ".latex");
+        SUFFIX_MAP.put("audio/x-liquid-secure", ".lavs");
+        SUFFIX_MAP.put("application/x-lbm", ".lbm");
+        SUFFIX_MAP.put("audio/x-la-lms", ".lmsff");
+        SUFFIX_MAP.put("application/x-javascript", ".ls");
+        SUFFIX_MAP.put("application/x-ltr", ".ltr");
+        SUFFIX_MAP.put("video/x-mpeg", ".m1v");
+        SUFFIX_MAP.put("video/x-mpeg", ".m2v");
+        SUFFIX_MAP.put("audio/mpegurl", ".m3u");
+        SUFFIX_MAP.put("video/mpeg4", ".m4e");
+        SUFFIX_MAP.put("application/x-mac", ".mac");
+        SUFFIX_MAP.put("application/x-troff-man", ".man");
+        SUFFIX_MAP.put("text/xml", ".math");
+        SUFFIX_MAP.put("application/msaccess", ".mdb");
+        SUFFIX_MAP.put("application/x-mdb", ".mdb");
+        SUFFIX_MAP.put("application/x-shockwave-flash", ".mfp");
+        SUFFIX_MAP.put("message/rfc822", ".mht");
+        SUFFIX_MAP.put("message/rfc822", ".mhtml");
+        SUFFIX_MAP.put("application/x-mi", ".mi");
+        SUFFIX_MAP.put("audio/mid", ".mid");
+        SUFFIX_MAP.put("audio/mid", ".midi");
+        SUFFIX_MAP.put("application/x-mil", ".mil");
+        SUFFIX_MAP.put("text/xml", ".mml");
+        SUFFIX_MAP.put("audio/x-musicnet-download", ".mnd");
+        SUFFIX_MAP.put("audio/x-musicnet-stream", ".mns");
+        SUFFIX_MAP.put("application/x-javascript", ".mocha");
+        SUFFIX_MAP.put("video/x-sgi-movie", ".movie");
+        SUFFIX_MAP.put("audio/mp1", ".mp1");
+        SUFFIX_MAP.put("audio/mp2", ".mp2");
+        SUFFIX_MAP.put("video/mpeg", ".mp2v");
+        SUFFIX_MAP.put("audio/mp3", ".mp3");
+        SUFFIX_MAP.put("video/mpeg4", ".mp4");
+        SUFFIX_MAP.put("video/mp4", ".mp4");
+        SUFFIX_MAP.put("video/x-mpg", ".mpa");
+        SUFFIX_MAP.put("application/vnd.ms-project", ".mpd");
+        SUFFIX_MAP.put("video/x-mpeg", ".mpe");
+        SUFFIX_MAP.put("video/mpg", ".mpeg");
+        SUFFIX_MAP.put("video/mpg", ".mpg");
+        SUFFIX_MAP.put("audio/rn-mpeg", ".mpga");
+        SUFFIX_MAP.put("application/vnd.ms-project", ".mpp");
+        SUFFIX_MAP.put("video/x-mpeg", ".mps");
+        SUFFIX_MAP.put("application/vnd.ms-project", ".mpt");
+        SUFFIX_MAP.put("video/mpg", ".mpv");
+        SUFFIX_MAP.put("video/mpeg", ".mpv2");
+        SUFFIX_MAP.put("application/vnd.ms-project", ".mpw");
+        SUFFIX_MAP.put("application/vnd.ms-project", ".mpx");
+        SUFFIX_MAP.put("text/xml", ".mtx");
+        SUFFIX_MAP.put("application/x-mmxp", ".mxp");
+        SUFFIX_MAP.put("image/pnetvue", ".net");
+        SUFFIX_MAP.put("application/x-nrf", ".nrf");
+        SUFFIX_MAP.put("message/rfc822", ".nws");
+        SUFFIX_MAP.put("text/x-ms-odc", ".odc");
+        SUFFIX_MAP.put("application/x-out", ".out");
+        SUFFIX_MAP.put("application/pkcs10", ".p10");
+        SUFFIX_MAP.put("application/x-pkcs12", ".p12");
+        SUFFIX_MAP.put("application/x-pkcs7-certificates", ".p7b");
+        SUFFIX_MAP.put("application/pkcs7-mime", ".p7c");
+        SUFFIX_MAP.put("application/pkcs7-mime", ".p7m");
+        SUFFIX_MAP.put("application/x-pkcs7-certreqresp", ".p7r");
+        SUFFIX_MAP.put("application/pkcs7-signature", ".p7s");
+        SUFFIX_MAP.put("application/x-pc5", ".pc5");
+        SUFFIX_MAP.put("application/x-pci", ".pci");
+        SUFFIX_MAP.put("application/x-pcl", ".pcl");
+        SUFFIX_MAP.put("application/x-pcx", ".pcx");
+        SUFFIX_MAP.put("application/pdf", ".pdf");
+        SUFFIX_MAP.put("application/pdf", ".pdf");
+        SUFFIX_MAP.put("application/vnd.adobe.pdx", ".pdx");
+        SUFFIX_MAP.put("application/x-pkcs12", ".pfx");
+        SUFFIX_MAP.put("application/x-pgl", ".pgl");
+        SUFFIX_MAP.put("application/x-pic", ".pic");
+        SUFFIX_MAP.put("application/vnd.ms-pki.pko", ".pko");
+        SUFFIX_MAP.put("application/x-perl", ".pl");
+        SUFFIX_MAP.put("text/html", ".plg");
+        SUFFIX_MAP.put("audio/scpls", ".pls");
+        SUFFIX_MAP.put("application/x-plt", ".plt");
+        SUFFIX_MAP.put("image/png", ".png");
+        SUFFIX_MAP.put("application/x-png", ".png");
+        SUFFIX_MAP.put("application/vnd.ms-powerpoint", ".pot");
+        SUFFIX_MAP.put("application/vnd.ms-powerpoint", ".ppa");
+        SUFFIX_MAP.put("application/x-ppm", ".ppm");
+        SUFFIX_MAP.put("application/vnd.ms-powerpoint", ".pps");
+        SUFFIX_MAP.put("application/vnd.ms-powerpoint", ".ppt");
+        SUFFIX_MAP.put("application/x-ppt", ".ppt");
+        SUFFIX_MAP.put("application/x-pr", ".pr");
+        SUFFIX_MAP.put("application/pics-rules", ".prf");
+        SUFFIX_MAP.put("application/x-prn", ".prn");
+        SUFFIX_MAP.put("application/x-prt", ".prt");
+        SUFFIX_MAP.put("application/x-ps", ".ps");
+        SUFFIX_MAP.put("application/postscript", ".ps");
+        SUFFIX_MAP.put("application/x-ptn", ".ptn");
+        SUFFIX_MAP.put("application/vnd.ms-powerpoint", ".pwz");
+        SUFFIX_MAP.put("text/vnd.rn-realtext3d", ".r3t");
+        SUFFIX_MAP.put("audio/vnd.rn-realaudio", ".ra");
+        SUFFIX_MAP.put("audio/x-pn-realaudio", ".ram");
+        SUFFIX_MAP.put("application/x-ras", ".ras");
+        SUFFIX_MAP.put("application/rat-file", ".rat");
+        SUFFIX_MAP.put("text/xml", ".rdf");
+        SUFFIX_MAP.put("application/vnd.rn-recording", ".rec");
+        SUFFIX_MAP.put("application/x-red", ".red");
+        SUFFIX_MAP.put("application/x-rgb", ".rgb");
+        SUFFIX_MAP.put("application/vnd.rn-realsystem-rjs", ".rjs");
+        SUFFIX_MAP.put("application/vnd.rn-realsystem-rjt", ".rjt");
+        SUFFIX_MAP.put("application/x-rlc", ".rlc");
+        SUFFIX_MAP.put("application/x-rle", ".rle");
+        SUFFIX_MAP.put("application/vnd.rn-realmedia", ".rm");
+        SUFFIX_MAP.put("application/vnd.adobe.rmf", ".rmf");
+        SUFFIX_MAP.put("audio/mid", ".rmi");
+        SUFFIX_MAP.put("application/vnd.rn-realsystem-rmj", ".rmj");
+        SUFFIX_MAP.put("audio/x-pn-realaudio", ".rmm");
+        SUFFIX_MAP.put("application/vnd.rn-rn_music_package", ".rmp");
+        SUFFIX_MAP.put("application/vnd.rn-realmedia-secure", ".rms");
+        SUFFIX_MAP.put("application/vnd.rn-realmedia-vbr", ".rmvb");
+        SUFFIX_MAP.put("application/vnd.rn-realsystem-rmx", ".rmx");
+        SUFFIX_MAP.put("application/vnd.rn-realplayer", ".rnx");
+        SUFFIX_MAP.put("image/vnd.rn-realpix", ".rp");
+        SUFFIX_MAP.put("audio/x-pn-realaudio-plugin", ".rpm");
+        SUFFIX_MAP.put("application/vnd.rn-rsml", ".rsml");
+        SUFFIX_MAP.put("text/vnd.rn-realtext", ".rt");
+        SUFFIX_MAP.put("application/msword", ".rtf");
+        SUFFIX_MAP.put("application/x-rtf", ".rtf");
+        SUFFIX_MAP.put("video/vnd.rn-realvideo", ".rv");
+        SUFFIX_MAP.put("application/x-sam", ".sam");
+        SUFFIX_MAP.put("application/x-sat", ".sat");
+        SUFFIX_MAP.put("application/sdp", ".sdp");
+        SUFFIX_MAP.put("application/x-sdw", ".sdw");
+        SUFFIX_MAP.put("application/x-stuffit", ".sit");
+        SUFFIX_MAP.put("application/x-slb", ".slb");
+        SUFFIX_MAP.put("application/x-sld", ".sld");
+        SUFFIX_MAP.put("drawing/x-slk", ".slk");
+        SUFFIX_MAP.put("application/smil", ".smi");
+        SUFFIX_MAP.put("application/smil", ".smil");
+        SUFFIX_MAP.put("application/x-smk", ".smk");
+        SUFFIX_MAP.put("audio/basic", ".snd");
+        SUFFIX_MAP.put("text/plain", ".sol");
+        SUFFIX_MAP.put("text/plain", ".sor");
+        SUFFIX_MAP.put("application/x-pkcs7-certificates", ".spc");
+        SUFFIX_MAP.put("application/futuresplash", ".spl");
+        SUFFIX_MAP.put("text/xml", ".spp");
+        SUFFIX_MAP.put("application/streamingmedia", ".ssm");
+        SUFFIX_MAP.put("application/vnd.ms-pki.certstore", ".sst");
+        SUFFIX_MAP.put("application/vnd.ms-pki.stl", ".stl");
+        SUFFIX_MAP.put("text/html", ".stm");
+        SUFFIX_MAP.put("application/x-sty", ".sty");
+        SUFFIX_MAP.put("text/xml", ".svg");
+        SUFFIX_MAP.put("application/x-shockwave-flash", ".swf");
+        SUFFIX_MAP.put("application/x-tdf", ".tdf");
+        SUFFIX_MAP.put("application/x-tg4", ".tg4");
+        SUFFIX_MAP.put("application/x-tga", ".tga");
+        SUFFIX_MAP.put("image/tiff", ".tif");
+        SUFFIX_MAP.put("application/x-tif", ".tif");
+        SUFFIX_MAP.put("image/tiff", ".tiff");
+        SUFFIX_MAP.put("text/xml", ".tld");
+        SUFFIX_MAP.put("drawing/x-top", ".top");
+        SUFFIX_MAP.put("application/x-bittorrent", ".torrent");
+        SUFFIX_MAP.put("text/xml", ".tsd");
+        SUFFIX_MAP.put("text/plain", ".txt");
+        SUFFIX_MAP.put("application/x-icq", ".uin");
+        SUFFIX_MAP.put("text/iuls", ".uls");
+        SUFFIX_MAP.put("text/x-vcard", ".vcf");
+        SUFFIX_MAP.put("application/x-vda", ".vda");
+        SUFFIX_MAP.put("application/vnd.visio", ".vdx");
+        SUFFIX_MAP.put("text/xml", ".vml");
+        SUFFIX_MAP.put("application/x-vpeg005", ".vpg");
+        SUFFIX_MAP.put("application/vnd.visio", ".vsd");
+        SUFFIX_MAP.put("application/x-vsd", ".vsd");
+        SUFFIX_MAP.put("application/vnd.visio", ".vss");
+        SUFFIX_MAP.put("application/vnd.visio", ".vst");
+        SUFFIX_MAP.put("application/x-vst", ".vst");
+        SUFFIX_MAP.put("application/vnd.visio", ".vsw");
+        SUFFIX_MAP.put("application/vnd.visio", ".vsx");
+        SUFFIX_MAP.put("application/vnd.visio", ".vtx");
+        SUFFIX_MAP.put("text/xml", ".vxml");
+        SUFFIX_MAP.put("audio/wav", ".wav");
+        SUFFIX_MAP.put("audio/x-ms-wax", ".wax");
+        SUFFIX_MAP.put("application/x-wb1", ".wb1");
+        SUFFIX_MAP.put("application/x-wb2", ".wb2");
+        SUFFIX_MAP.put("application/x-wb3", ".wb3");
+        SUFFIX_MAP.put("image/vnd.wap.wbmp", ".wbmp");
+        SUFFIX_MAP.put("application/msword", ".wiz");
+        SUFFIX_MAP.put("application/x-wk3", ".wk3");
+        SUFFIX_MAP.put("application/x-wk4", ".wk4");
+        SUFFIX_MAP.put("application/x-wkq", ".wkq");
+        SUFFIX_MAP.put("application/x-wks", ".wks");
+        SUFFIX_MAP.put("video/x-ms-wm", ".wm");
+        SUFFIX_MAP.put("audio/x-ms-wma", ".wma");
+        SUFFIX_MAP.put("application/x-ms-wmd", ".wmd");
+        SUFFIX_MAP.put("application/x-wmf", ".wmf");
+        SUFFIX_MAP.put("text/vnd.wap.wml", ".wml");
+        SUFFIX_MAP.put("video/x-ms-wmv", ".wmv");
+        SUFFIX_MAP.put("video/x-ms-wmx", ".wmx");
+        SUFFIX_MAP.put("application/x-ms-wmz", ".wmz");
+        SUFFIX_MAP.put("application/x-wp6", ".wp6");
+        SUFFIX_MAP.put("application/x-wpd", ".wpd");
+        SUFFIX_MAP.put("application/x-wpg", ".wpg");
+        SUFFIX_MAP.put("application/vnd.ms-wpl", ".wpl");
+        SUFFIX_MAP.put("application/x-wq1", ".wq1");
+        SUFFIX_MAP.put("application/x-wr1", ".wr1");
+        SUFFIX_MAP.put("application/x-wri", ".wri");
+        SUFFIX_MAP.put("application/x-wrk", ".wrk");
+        SUFFIX_MAP.put("application/x-ws", ".ws");
+        SUFFIX_MAP.put("application/x-ws", ".ws2");
+        SUFFIX_MAP.put("text/scriptlet", ".wsc");
+        SUFFIX_MAP.put("text/xml", ".wsdl");
+        SUFFIX_MAP.put("video/x-ms-wvx", ".wvx");
+        SUFFIX_MAP.put("application/vnd.adobe.xdp", ".xdp");
+        SUFFIX_MAP.put("text/xml", ".xdr");
+        SUFFIX_MAP.put("application/vnd.adobe.xfd", ".xfd");
+        SUFFIX_MAP.put("application/vnd.adobe.xfdf", ".xfdf");
+        SUFFIX_MAP.put("text/html", ".xhtml");
+        SUFFIX_MAP.put("application/vnd.ms-excel", ".xls");
+        SUFFIX_MAP.put("application/x-xls", ".xls");
+        SUFFIX_MAP.put("application/x-xlw", ".xlw");
+        SUFFIX_MAP.put("text/xml", ".xml");
+        SUFFIX_MAP.put("audio/scpls", ".xpl");
+        SUFFIX_MAP.put("text/xml", ".xq");
+        SUFFIX_MAP.put("text/xml", ".xql");
+        SUFFIX_MAP.put("text/xml", ".xquery");
+        SUFFIX_MAP.put("text/xml", ".xsd");
+        SUFFIX_MAP.put("text/xml", ".xsl");
+        SUFFIX_MAP.put("text/xml", ".xslt");
+        SUFFIX_MAP.put("application/x-xwd", ".xwd");
+        SUFFIX_MAP.put("application/x-x_b", ".x_b");
+        SUFFIX_MAP.put("application/vnd.symbian.install", ".sis");
+        SUFFIX_MAP.put("application/vnd.symbian.install", ".sisx");
+        SUFFIX_MAP.put("application/x-x_t", ".x_t");
+        SUFFIX_MAP.put("application/vnd.iphone", ".ipa");
+        SUFFIX_MAP.put("application/vnd.android.package-archive", ".apk");
+        SUFFIX_MAP.put("application/x-silverlight-app", ".xap");
+
+
+    }
+
+    public static String urlEncode(String part, String charset) {
+        try {
+            if(null == charset || null == part) {
+                return part;
+            } else {
+                return URLEncoder.encode(part, charset);
+            }
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("编码错误");
+        }
+    }
+
+    @SneakyThrows
+    public static String getFileNameFromUrl(String url) {
+        boolean isFile = SUFFIX_MAP.values().stream().anyMatch(url::endsWith);
+        if (isFile) {
+            return URLDecoder.decode(url.substring(url.lastIndexOf("/") + 1), StandardCharsets.UTF_8);
+        }else {
+            return null;
+        }
+    }
+
+}

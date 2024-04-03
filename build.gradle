@@ -1,0 +1,112 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        maven {
+            url "http://nexus.devops.axinfu.com/repository/maven-public/"
+            allowInsecureProtocol(true)
+            credentials {
+                username = 'jiangliangtong'
+                password = 'abcde_1234'
+            }
+        }
+        maven {
+            url "http://nexus.devops.axinfu.com/repository/maven-releases/"
+            allowInsecureProtocol(true)
+            credentials {
+                username = 'jiangliangtong'
+                password = 'abcde_1234'
+            }
+        }
+        maven {
+            url "http://nexus.devops.axinfu.com/repository/maven-thirdparty/"
+            allowInsecureProtocol(true)
+            credentials {
+                username = 'jiangliangtong'
+                password = 'abcde_1234'
+            }
+        }
+        jcenter()
+    }
+    dependencies {
+        classpath(
+                'org.springframework.boot:spring-boot-gradle-plugin:3.2.4'
+        )
+    }
+}
+
+allprojects {
+//    apply plugin: 'java'
+    apply plugin: 'java-library'
+    group = 'org.swordsmen'
+    version = '1.0.0'
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
+}
+
+subprojects {
+//    apply plugin: 'java'
+    apply plugin: 'java-library'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+
+    repositories {
+        mavenLocal()
+        maven {
+            url "http://nexus.devops.axinfu.com/repository/maven-public/"
+            allowInsecureProtocol(true)
+            credentials {
+                username = 'jiangliangtong'
+                password = 'abcde_1234'
+            }
+        }
+        maven {
+            url "http://nexus.devops.axinfu.com/repository/maven-releases/"
+            allowInsecureProtocol(true)
+            credentials {
+                username = 'jiangliangtong'
+                password = 'abcde_1234'
+            }
+        }
+        maven {
+            url "http://nexus.devops.axinfu.com/repository/maven-thirdparty/"
+            allowInsecureProtocol(true)
+            credentials {
+                username = 'jiangliangtong'
+                password = 'abcde_1234'
+            }
+        }
+        jcenter()
+    }
+
+    dependencyManagement {
+        dependencies {
+            imports {
+//                mavenBom 'com.axin.tool:axin-tool-dependencies:2.2.1'
+            }
+            dependency 'org.projectlombok:lombok:1.18.32'
+        }
+    }
+
+    dependencies {
+
+        annotationProcessor 'org.projectlombok:lombok'
+        compileOnly 'org.projectlombok:lombok'
+        testAnnotationProcessor 'org.projectlombok:lombok'
+        testCompileOnly 'org.projectlombok:lombok'
+
+        annotationProcessor "org.springframework.boot:spring-boot-configuration-processor"
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+//        compileOnly 'org.springframework.boot:spring-boot-starter-tomcat'
+
+        implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+}

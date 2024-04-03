@@ -1,0 +1,15 @@
+dependencies {
+    api (
+            'com.google.guava:guava:33.1.0-jre',
+            'org.apache.commons:commons-lang3:3.14.0',
+            'org.apache.commons:commons-collections4:4.4'
+    )
+}
+
+bootJar {
+    enabled = false
+}
+
+jar {
+    enabled = true
+}

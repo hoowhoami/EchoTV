@@ -1,0 +1,11 @@
+rootProject.name = 'openai-proxy'
+include 'openai-proxy-server'
+include 'openai-proxy-channel'
+include 'openai-proxy-channel:openai-proxy-channel-chatgpt'
+findProject(':openai-proxy-channel:openai-proxy-channel-chatgpt')?.name = 'openai-proxy-channel-chatgpt'
+include 'openai-proxy-channel:openai-proxy-channel-core'
+findProject(':openai-proxy-channel:openai-proxy-channel-core')?.name = 'openai-proxy-channel-core'
+include 'openai-proxy-common'
+include 'openai-proxy-common:openai-proxy-common-core'
+findProject(':openai-proxy-common:openai-proxy-common-core')?.name = 'openai-proxy-common-core'
+

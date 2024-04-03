@@ -1,0 +1,11 @@
+dependencies {
+    api project(':openai-proxy-channel:openai-proxy-channel-core')
+}
+
+bootJar {
+    enabled = false
+}
+
+jar {
+    enabled = true
+}

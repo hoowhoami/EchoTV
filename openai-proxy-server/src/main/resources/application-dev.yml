@@ -1,0 +1,5 @@
+proxy:
+  openai:
+    #    api-key: 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
+    api-key: sk-bb9ae475ba964710932f623198cc7d91
+    base-url: https://api.deepseek.com

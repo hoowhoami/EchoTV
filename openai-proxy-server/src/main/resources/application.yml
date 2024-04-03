@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: openai-proxy
+  threads:
+    virtual:
+      enabled: true
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+    serialization:
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+    parser:
+      allow-unquoted-control-chars: true
+      allow-single-quotes: true
