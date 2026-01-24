@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/movie.dart';
@@ -35,7 +36,19 @@ class DoubanService {
     try {
       final baseUrl = await getDoubanBase('m');
       final response = await _dio.get('$baseUrl/rexxar/api/v2/movie/$id');
-      final data = response.data;
+
+      Map<String, dynamic> data;
+      if (response.data is String) {
+        try {
+          data = jsonDecode(response.data);
+        } catch (e) {
+          return null;
+        }
+      } else if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data);
+      } else {
+        return null;
+      }
 
       return DoubanSubject(
         id: data['id'].toString(),
@@ -51,7 +64,20 @@ class DoubanService {
       try {
         final baseUrl = await getDoubanBase('m');
         final response = await _dio.get('$baseUrl/rexxar/api/v2/tv/$id');
-        final data = response.data;
+
+        Map<String, dynamic> data;
+        if (response.data is String) {
+          try {
+            data = jsonDecode(response.data);
+          } catch (e) {
+            return null;
+          }
+        } else if (response.data is Map) {
+          data = Map<String, dynamic>.from(response.data);
+        } else {
+          return null;
+        }
+
         return DoubanSubject(
           id: data['id'].toString(),
           title: data['title'] ?? '',
@@ -76,26 +102,52 @@ class DoubanService {
         'page_limit': 24,
         'page_start': pageStart,
       });
-      
-      final subjects = response.data['subjects'] as List;
-      return subjects.map((s) => DoubanSubject.fromJson(s)).toList();
+
+      Map<String, dynamic> data;
+      if (response.data is String) {
+        try {
+          data = jsonDecode(response.data);
+        } catch (e) {
+          return [];
+        }
+      } else if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data);
+      } else {
+        return [];
+      }
+
+      final subjects = data['subjects'] as List;
+      return subjects.map((s) => DoubanSubject.fromJson(Map<String, dynamic>.from(s))).toList();
     } catch (e) {
       return [];
     }
   }
 
-  Future<List<DoubanSubject>> getRexxarList(String kind, String category, String type, {int pageStart = 0}) async {
+  Future<List<DoubanSubject>> getRexxarList(String kind, String category, String type, {int pageStart = 0, int count = 24}) async {
     try {
       final baseUrl = await getDoubanBase('m');
       final response = await _dio.get('$baseUrl/rexxar/api/v2/subject/recent_hot/$kind', queryParameters: {
         'start': pageStart,
-        'count': 24,
+        'count': count,
         'category': category,
         'type': type,
       });
-      
-      final items = response.data['items'] as List;
-      return items.map((s) => DoubanSubject.fromJson(s)).toList();
+
+      Map<String, dynamic> data;
+      if (response.data is String) {
+        try {
+          data = jsonDecode(response.data);
+        } catch (e) {
+          return [];
+        }
+      } else if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data);
+      } else {
+        return [];
+      }
+
+      final items = data['items'] as List;
+      return items.map((s) => DoubanSubject.fromJson(Map<String, dynamic>.from(s))).toList();
     } catch (e) {
       return [];
     }
@@ -107,15 +159,40 @@ class DoubanService {
       final tags = <String>[];
       final selectedCategories = <String, String>{};
 
-      if (filters['type'] != null && filters['type'] != 'all') {
-        tags.add(filters['type']!);
-        selectedCategories['类型'] = filters['type']!;
+      // Some callers (e.g. LunaTV port) may pass the filter under the
+      // legacy key 'type'. Support both for robustness.
+      final category = filters['category'] ?? filters['type'];
+      final format = filters['format'];
+      final region = filters['region'];
+      final year = filters['year'];
+      final platform = filters['platform'];
+      final label = filters['label'];
+      final sort = filters['sort'];
+
+      if (category != null && category != 'all' && category.isNotEmpty) {
+        tags.add(category);
+        selectedCategories['类型'] = category;
       }
-      if (filters['region'] != null && filters['region'] != 'all') {
-        tags.add(filters['region']!);
-        selectedCategories['地区'] = filters['region']!;
+      if (format != null && format != 'all' && format.isNotEmpty) {
+        if (category == null || category.isEmpty || category == 'all') {
+          tags.add(format);
+        }
+        selectedCategories['形式'] = format;
       }
-      
+      if (region != null && region != 'all' && region.isNotEmpty) {
+        tags.add(region);
+        selectedCategories['地区'] = region;
+      }
+      if (label != null && label != 'all' && label.isNotEmpty) {
+        tags.add(label);
+      }
+      if (year != null && year != 'all' && year.isNotEmpty) {
+        tags.add(year);
+      }
+      if (platform != null && platform != 'all' && platform.isNotEmpty) {
+        tags.add(platform);
+      }
+
       final queryParams = {
         'refresh': '0',
         'start': pageStart,
@@ -123,10 +200,29 @@ class DoubanService {
         'uncollect': 'false',
         'score_range': '0,10',
         'tags': tags.join(','),
+        'selected_categories': jsonEncode(selectedCategories),
       };
 
+      if (sort != null && sort != 'T' && sort.isNotEmpty) {
+        queryParams['sort'] = sort;
+      }
+
       final response = await _dio.get('$baseUrl/rexxar/api/v2/$kind/recommend', queryParameters: queryParams);
-      final items = response.data['items'] as List;
+
+      Map<String, dynamic> data;
+      if (response.data is String) {
+        try {
+          data = jsonDecode(response.data);
+        } catch (e) {
+          return [];
+        }
+      } else if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data);
+      } else {
+        return [];
+      }
+
+      final items = data['items'] as List;
       return items.where((i) => i['type'] == 'movie' || i['type'] == 'tv').map((s) => DoubanSubject.fromJson(s)).toList();
     } catch (e) {
       return [];

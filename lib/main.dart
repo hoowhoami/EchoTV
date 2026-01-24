@@ -53,6 +53,10 @@ final _router = GoRouter(
           builder: (context, state) => const ExplorePage(title: '动漫', type: 'anime'),
         ),
         GoRoute(
+          path: '/variety',
+          builder: (context, state) => const ExplorePage(title: '综艺', type: 'show'),
+        ),
+        GoRoute(
           path: '/live',
           builder: (context, state) => const LivePage(),
         ),

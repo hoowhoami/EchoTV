@@ -2,20 +2,198 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/douban_service.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/douban_selector.dart';
 import '../models/movie.dart';
 import 'video_detail.dart';
 
-final exploreMoviesProvider = FutureProvider.family<List<DoubanSubject>, Map<String, dynamic>>((ref, params) async {
-  final service = ref.watch(doubanServiceProvider);
-  final type = params['type'] as String;
-  return service.getRexxarList(type == 'anime' ? 'tv' : type, '热门', '全部');
-});
-
-class ExplorePage extends ConsumerWidget {
+class ExplorePage extends ConsumerStatefulWidget {
   final String title;
   final String type;
 
   const ExplorePage({Key? key, required this.title, required this.type}) : super(key: key);
+
+  @override
+  ConsumerState<ExplorePage> createState() => _ExplorePageState();
+}
+
+class _ExplorePageState extends ConsumerState<ExplorePage> {
+  late String primarySelection;
+  late String secondarySelection;
+  Map<String, String> multiLevelFilters = {};
+
+  List<DoubanSubject> movies = [];
+  bool isLoading = false;
+  bool isLoadingMore = false;
+  bool hasMore = true;
+  int currentPage = 0;
+
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // 根据类型设置默认选择
+    if (widget.type == 'movie') {
+      primarySelection = '热门';
+      secondarySelection = '全部';
+    } else if (widget.type == 'tv') {
+      primarySelection = '最近热门';
+      secondarySelection = 'tv';
+    } else if (widget.type == 'show') {
+      primarySelection = '最近热门';
+      secondarySelection = 'show';
+    } else if (widget.type == 'anime') {
+      primarySelection = '番剧';
+      secondarySelection = '';
+    } else {
+      primarySelection = '热门';
+      secondarySelection = '全部';
+    }
+
+    _scrollController.addListener(_onScroll);
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 500) {
+      if (!isLoadingMore && hasMore) {
+        _loadMoreData();
+      }
+    }
+  }
+
+  Future<void> _loadData() async {
+    if (isLoading) return;
+
+    setState(() {
+      isLoading = true;
+      movies = [];
+      currentPage = 0;
+      hasMore = true;
+    });
+
+    final service = ref.read(doubanServiceProvider);
+    final data = await _fetchData(service, 0);
+
+    if (mounted) {
+      setState(() {
+        movies = data;
+        isLoading = false;
+        hasMore = data.isNotEmpty;
+      });
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (isLoadingMore || !hasMore) return;
+
+    setState(() {
+      isLoadingMore = true;
+    });
+
+    final service = ref.read(doubanServiceProvider);
+    final nextPage = currentPage + 1;
+    final data = await _fetchData(service, nextPage);
+
+    if (mounted) {
+      setState(() {
+        if (data.isNotEmpty) {
+          movies.addAll(data);
+          currentPage = nextPage;
+          hasMore = data.isNotEmpty;
+        } else {
+          hasMore = false;
+        }
+        isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<List<DoubanSubject>> _fetchData(DoubanService service, int page) async {
+    final pageStart = page * 24;
+    final multiLevel = _encodeMultiLevelFilters();
+
+    // 电影
+    if (widget.type == 'movie') {
+      if (primarySelection == '全部') {
+        final filters = <String, String>{};
+        if (multiLevel.isNotEmpty) {
+          final filterParts = multiLevel.split(',');
+          for (var part in filterParts) {
+            final kv = part.split('=');
+            if (kv.length == 2 && kv[1] != 'all' && kv[1] != 'T') {
+              filters[kv[0]] = kv[1];
+            }
+          }
+        }
+        return service.getRecommendList('movie', filters, pageStart: pageStart);
+      } else {
+        return service.getRexxarList('movie', primarySelection, secondarySelection, pageStart: pageStart);
+      }
+    }
+
+    // 剧集
+    else if (widget.type == 'tv') {
+      if (primarySelection == '全部') {
+        final filters = <String, String>{'format': '电视剧'};
+        if (multiLevel.isNotEmpty) {
+          final filterParts = multiLevel.split(',');
+          for (var part in filterParts) {
+            final kv = part.split('=');
+            if (kv.length == 2 && kv[1] != 'all' && kv[1] != 'T') {
+              filters[kv[0]] = kv[1];
+            }
+          }
+        }
+        return service.getRecommendList('tv', filters, pageStart: pageStart);
+      } else {
+        return service.getRexxarList('tv', secondarySelection, secondarySelection, pageStart: pageStart);
+      }
+    }
+
+    // 综艺
+    else if (widget.type == 'show') {
+      if (primarySelection == '全部') {
+        final filters = <String, String>{'format': '综艺'};
+        if (multiLevel.isNotEmpty) {
+          final filterParts = multiLevel.split(',');
+          for (var part in filterParts) {
+            final kv = part.split('=');
+            if (kv.length == 2 && kv[1] != 'all' && kv[1] != 'T') {
+              filters[kv[0]] = kv[1];
+            }
+          }
+        }
+        return service.getRecommendList('tv', filters, pageStart: pageStart);
+      } else {
+        return service.getRexxarList('tv', secondarySelection, secondarySelection, pageStart: pageStart);
+      }
+    }
+
+    // 动漫
+    else if (widget.type == 'anime') {
+      final filters = <String, String>{'category': '动画'};
+      if (primarySelection == '番剧') {
+        filters['format'] = '电视剧';
+        return service.getRecommendList('tv', filters, pageStart: pageStart);
+      } else {
+        return service.getRecommendList('movie', filters, pageStart: pageStart);
+      }
+    }
+
+    return service.getRexxarList('movie', '热门', '全部', pageStart: pageStart);
+  }
+
+  String _encodeMultiLevelFilters() {
+    if (multiLevelFilters.isEmpty) return '';
+    return multiLevelFilters.entries.map((e) => '${e.key}=${e.value}').join(',');
+  }
 
   void _handleMovieTap(BuildContext context, DoubanSubject movie) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -24,12 +202,15 @@ class ExplorePage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final movies = ref.watch(exploreMoviesProvider({'type': type}));
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 1200 ? 6 : (screenWidth > 800 ? 4 : 3);
+    final horizontalPadding = screenWidth > 800 ? 48.0 : 24.0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverAppBar(
             backgroundColor: Colors.transparent,
@@ -38,39 +219,107 @@ class ExplorePage extends ConsumerWidget {
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               title: Text(
-                title,
+                widget.title,
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 24),
               ),
             ),
           ),
-          
-          movies.when(
-            data: (items) => SliverPadding(
+
+          // 筛选器
+          SliverToBoxAdapter(
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: DoubanSelector(
+                type: widget.type,
+                primarySelection: primarySelection,
+                secondarySelection: secondarySelection,
+                onPrimaryChange: (value) {
+                  setState(() {
+                    primarySelection = value;
+                    multiLevelFilters = {};
+                    // 重置二级选择
+                    if (widget.type == 'movie') {
+                      secondarySelection = '全部';
+                    } else if (widget.type == 'tv') {
+                      secondarySelection = 'tv';
+                    } else if (widget.type == 'show') {
+                      secondarySelection = 'show';
+                    }
+                  });
+                  _loadData();
+                },
+                onSecondaryChange: (value) {
+                  setState(() {
+                    secondarySelection = value;
+                  });
+                  _loadData();
+                },
+                onMultiLevelChange: (values) {
+                  setState(() {
+                    multiLevelFilters = values;
+                  });
+                  _loadData();
+                },
+              ),
+            ),
+          ),
+
+          if (isLoading)
+            const SliverToBoxAdapter(
+              child: Center(child: Padding(
+                padding: EdgeInsets.all(48.0),
+                child: CircularProgressIndicator(),
+              )),
+            )
+          else if (movies.isEmpty)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(48.0),
+                  child: Text('暂无内容', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
                   childAspectRatio: 0.65,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 24,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => MovieCard(
-                    movie: items[index],
-                    onTap: () => _handleMovieTap(context, items[index]),
+                    movie: movies[index],
+                    onTap: () => _handleMovieTap(context, movies[index]),
                   ),
-                  childCount: items.length,
+                  childCount: movies.length,
                 ),
               ),
             ),
-            loading: () => const SliverToBoxAdapter(
-              child: Center(child: CircularProgressIndicator()),
+
+          if (isLoadingMore)
+            const SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
             ),
-            error: (err, stack) => SliverToBoxAdapter(
-              child: Center(child: Text('Error: $err', style: TextStyle(color: Theme.of(context).colorScheme.primary))),
+
+          if (!hasMore && movies.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text('已加载全部内容', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+                ),
+              ),
             ),
-          ),
-          
+
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
