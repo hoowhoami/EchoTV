@@ -6,7 +6,7 @@ class ZenTheme {
   static const Color lightBackground = Color(0xFFF2F2F7);
   static const Color lightSecondaryBackground = Color(0xFFFFFFFF);
   static const Color lightTertiaryBackground = Color(0xFFE5E5EA);
-  
+
   static const Color darkBackground = Color(0xFF000000);
   static const Color darkSecondaryBackground = Color(0xFF1C1C1E);
   static const Color darkTertiaryBackground = Color(0xFF2C2C2E);
@@ -19,6 +19,18 @@ class ZenTheme {
   static const Color lightTextSecondary = Color(0xFF8E8E93);
   static const Color darkTextPrimary = Color(0xFFFFFFFF);
   static const Color darkTextSecondary = Color(0xFFAEAEB2);
+
+  // 尝试加载 Google Fonts，如果失败则使用系统字体
+  static TextTheme _safeTextTheme({
+    required TextTheme Function() googleFont,
+    required TextTheme fallback,
+  }) {
+    try {
+      return googleFont();
+    } catch (e) {
+      return fallback;
+    }
+  }
 
   static ThemeData lightTheme() {
     return ThemeData(
@@ -34,25 +46,48 @@ class ZenTheme {
         surface: lightSecondaryBackground,
         background: lightBackground,
       ),
-      textTheme: GoogleFonts.interTextTheme().copyWith(
-        displayLarge: GoogleFonts.inter(
-          fontWeight: FontWeight.w800, 
-          color: lightTextPrimary, 
-          letterSpacing: -1.5,
-          fontSize: 32,
+      textTheme: _safeTextTheme(
+        googleFont: () => GoogleFonts.interTextTheme().copyWith(
+          displayLarge: GoogleFonts.inter(
+            fontWeight: FontWeight.w800,
+            color: lightTextPrimary,
+            letterSpacing: -1.5,
+            fontSize: 32,
+          ),
+          titleLarge: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            color: lightTextPrimary,
+            fontSize: 20,
+          ),
+          bodyLarge: GoogleFonts.inter(color: lightTextPrimary),
+          bodyMedium: GoogleFonts.inter(color: lightTextPrimary.withValues(alpha: 0.8)),
+          labelMedium: GoogleFonts.inter(
+            color: lightTextSecondary,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            fontSize: 10,
+          ),
         ),
-        titleLarge: GoogleFonts.inter(
-          fontWeight: FontWeight.bold, 
-          color: lightTextPrimary,
-          fontSize: 20,
-        ),
-        bodyLarge: GoogleFonts.inter(color: lightTextPrimary),
-        bodyMedium: GoogleFonts.inter(color: lightTextPrimary.withOpacity(0.8)),
-        labelMedium: GoogleFonts.inter(
-          color: lightTextSecondary, 
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-          fontSize: 10,
+        fallback: TextTheme(
+          displayLarge: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: lightTextPrimary,
+            letterSpacing: -1.5,
+            fontSize: 32,
+          ),
+          titleLarge: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: lightTextPrimary,
+            fontSize: 20,
+          ),
+          bodyLarge: TextStyle(color: lightTextPrimary),
+          bodyMedium: TextStyle(color: lightTextPrimary.withValues(alpha: 0.8)),
+          labelMedium: TextStyle(
+            color: lightTextSecondary,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            fontSize: 10,
+          ),
         ),
       ),
     );
@@ -72,25 +107,48 @@ class ZenTheme {
         surface: darkSecondaryBackground,
         background: darkBackground,
       ),
-      textTheme: GoogleFonts.interTextTheme().copyWith(
-        displayLarge: GoogleFonts.inter(
-          fontWeight: FontWeight.w800, 
-          color: darkTextPrimary, 
-          letterSpacing: -1.5,
-          fontSize: 32,
+      textTheme: _safeTextTheme(
+        googleFont: () => GoogleFonts.interTextTheme().copyWith(
+          displayLarge: GoogleFonts.inter(
+            fontWeight: FontWeight.w800,
+            color: darkTextPrimary,
+            letterSpacing: -1.5,
+            fontSize: 32,
+          ),
+          titleLarge: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            color: darkTextPrimary,
+            fontSize: 20,
+          ),
+          bodyLarge: GoogleFonts.inter(color: darkTextPrimary),
+          bodyMedium: GoogleFonts.inter(color: darkTextPrimary.withValues(alpha: 0.8)),
+          labelMedium: GoogleFonts.inter(
+            color: darkTextSecondary,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            fontSize: 10,
+          ),
         ),
-        titleLarge: GoogleFonts.inter(
-          fontWeight: FontWeight.bold, 
-          color: darkTextPrimary,
-          fontSize: 20,
-        ),
-        bodyLarge: GoogleFonts.inter(color: darkTextPrimary),
-        bodyMedium: GoogleFonts.inter(color: darkTextPrimary.withOpacity(0.8)),
-        labelMedium: GoogleFonts.inter(
-          color: darkTextSecondary, 
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-          fontSize: 10,
+        fallback: TextTheme(
+          displayLarge: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: darkTextPrimary,
+            letterSpacing: -1.5,
+            fontSize: 32,
+          ),
+          titleLarge: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: darkTextPrimary,
+            fontSize: 20,
+          ),
+          bodyLarge: TextStyle(color: darkTextPrimary),
+          bodyMedium: TextStyle(color: darkTextPrimary.withValues(alpha: 0.8)),
+          labelMedium: TextStyle(
+            color: darkTextSecondary,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+            fontSize: 10,
+          ),
         ),
       ),
     );

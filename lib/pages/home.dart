@@ -103,7 +103,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   itemBuilder: (context, index) {
                     return Container(
                       width: 160,
-                      margin: const EdgeInsets.only(right: 16),
+                      margin: EdgeInsets.only(right: index < movies.length - 1 ? 16 : 0),
                       child: GestureDetector(
                         onTap: () => _handleMovieTap(context, movies[index]),
                         child: Column(
@@ -229,7 +229,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               itemBuilder: (context, index) {
                 return Container(
                   width: 160,
-                  margin: const EdgeInsets.only(right: 16),
+                  margin: EdgeInsets.only(right: index < 7 ? 16 : 0),
                   child: Column(
                     children: [
                       Expanded(
@@ -266,19 +266,21 @@ class _HomePageState extends ConsumerState<HomePage> {
     final hotTvShows = ref.watch(hotTvShowsProvider);
     final hotVarietyShows = ref.watch(hotVarietyShowsProvider);
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             backgroundColor: Colors.transparent,
-            expandedHeight: 120,
             floating: true,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              title: Text(
-                'ECHOTV',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 28),
+            title: Text(
+              'ECHOTV',
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                fontSize: isPC ? 28 : 20,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),

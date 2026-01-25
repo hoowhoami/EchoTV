@@ -39,9 +39,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   final Map<String, double> _scoreMap = {};
   final Set<String> _testedSources = {};
 
-  // 分页相关
-  int _currentPage = 0;
-  final int _episodesPerPage = 50;
+  // 排序相关
   bool _descending = false;
 
   // PC端选集面板折叠状态（仅在 lg 及以上屏幕有效）
@@ -226,12 +224,21 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           floating: true,
           leading: Padding(
             padding: const EdgeInsets.only(left: 8),
-            child: ZenButton(
-              onPressed: () => Navigator.pop(context),
-              backgroundColor: Colors.black.withValues(alpha: 0.5),
-              borderRadius: 20,
-              padding: const EdgeInsets.all(12),
-              child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
+                ),
+              ),
             ),
           ),
         ),
@@ -353,9 +360,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   /// 计算播放器高度（参考 LunaTV）
   double _calculatePlayerHeight(double screenWidth) {
-    if (screenWidth < 1200) return 500;
-    if (screenWidth < 1600) return 650;
-    return 750;
+    if (screenWidth < 1200) return 400;
+    if (screenWidth < 1600) return 520;
+    return 600;
   }
 
   /// 选集面板（包含 Tab）- 简洁风格
@@ -681,6 +688,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(fontSize: 14),
         indicatorWeight: 2,
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
+        splashFactory: NoSplash.splashFactory,
         tabs: const [
           Tab(text: '选集'),
           Tab(text: '换源'),
@@ -705,11 +714,6 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
     final group = _currentSource!.playGroups.first;
     final totalEpisodes = group.urls.length;
-    final pageCount = (totalEpisodes / _episodesPerPage).ceil();
-
-    // 计算当前页的集数范围
-    final startIndex = _currentPage * _episodesPerPage;
-    final endIndex = (startIndex + _episodesPerPage).clamp(0, totalEpisodes);
 
     // 响应式布局
     final screenWidth = MediaQuery.of(context).size.width;
@@ -718,62 +722,24 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
     return CustomScrollView(
       slivers: [
-        // 分页选择器
-        if (pageCount > 1)
-          SliverToBoxAdapter(
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isPC ? 12 : 16,
-                vertical: isPC ? 10 : 4,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 40,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: pageCount,
-                        itemBuilder: (context, index) {
-                        final start = index * _episodesPerPage + 1;
-                        final end = ((index + 1) * _episodesPerPage).clamp(0, totalEpisodes);
-                        final isActive = index == _currentPage;
-                        return GestureDetector(
-                          onTap: () => setState(() => _currentPage = index),
-                          child: Container(
-                            margin: EdgeInsets.only(right: isPC ? 8 : 4),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isPC ? 18 : 8,
-                              vertical: isPC ? 10 : 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isActive ? theme.primaryColor : theme.colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(isPC ? 8 : 4),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '$start-$end',
-                                style: TextStyle(
-                                  color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onPrimaryContainer,
-                                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                  fontSize: isPC ? 12 : 10,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.swap_vert, color: theme.primaryColor, size: isPC ? 26 : 18),
-                    onPressed: () => setState(() => _descending = !_descending),
-                  ),
-                ],
-              ),
+        // 排序按钮
+        SliverToBoxAdapter(
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isPC ? 12 : 16,
+              vertical: isPC ? 10 : 4,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.swap_vert, color: theme.primaryColor, size: isPC ? 26 : 18),
+                  onPressed: () => setState(() => _descending = !_descending),
+                ),
+              ],
             ),
           ),
+        ),
 
         // 集数网格
         SliverPadding(
@@ -790,22 +756,36 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
             ),
             delegate: SliverChildBuilderDelegate(
               (context, i) {
-                final index = _descending ? (endIndex - 1 - i) : (startIndex + i);
+                final index = _descending ? (totalEpisodes - 1 - i) : i;
                 final isCurrent = _currentEpisodeIndex == index && _isPlaying;
                 return GestureDetector(
                   onTap: () => _initializePlayer(group.urls[index], index),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     decoration: BoxDecoration(
-                      color: isCurrent ? theme.primaryColor : theme.colorScheme.primaryContainer,
+                      color: isCurrent
+                          ? theme.primaryColor
+                          : theme.colorScheme.surface.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(isPC ? 8 : 4),
+                      border: isCurrent
+                          ? Border.all(
+                              color: theme.primaryColor,
+                              width: 2,
+                            )
+                          : Border.all(
+                              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                              width: 1,
+                            ),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       group.titles[index],
                       maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isCurrent ? theme.colorScheme.onPrimary : theme.colorScheme.onPrimaryContainer,
+                        color: isCurrent
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.85),
                         fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                         fontSize: isPC ? 12 : 11,
                       ),
@@ -813,7 +793,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                   ),
                 );
               },
-              childCount: endIndex - startIndex,
+              childCount: totalEpisodes,
             ),
           ),
         ),
@@ -881,16 +861,20 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                 padding: const EdgeInsets.only(bottom: 8),
                 child: GestureDetector(
                   onTap: () => _switchSource(res),
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? theme.primaryColor.withValues(alpha: 0.1)
-                          : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                          ? theme.primaryColor
+                          : theme.colorScheme.surface.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(10),
                       border: isSelected
-                          ? Border.all(color: theme.primaryColor.withValues(alpha: 0.3), width: 1.5)
-                          : null,
+                          ? Border.all(color: theme.primaryColor, width: 2)
+                          : Border.all(
+                              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                              width: 1,
+                            ),
                     ),
                     child: Row(
                       children: [
@@ -909,7 +893,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                                     res.title,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: isSelected ? theme.primaryColor : theme.colorScheme.primary,
+                                      color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface.withValues(alpha: 0.85),
                                       fontSize: 13,
                                     ),
                                     maxLines: 1,
@@ -920,7 +904,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                                     _buildQualityBadge(qualityInfo.quality, theme),
                                   // 选中图标
                                   if (isSelected)
-                                    Icon(Icons.check_circle, color: theme.primaryColor, size: 14),
+                                    Icon(Icons.check_circle, color: theme.colorScheme.onPrimary, size: 14),
                                 ],
                               ),
                               const SizedBox(height: 6),
@@ -932,18 +916,30 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                                 children: [
                                   Text(
                                     res.sourceName,
-                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.secondary),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isSelected
+                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
+                                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
                                   ),
                                   Text(
                                     '${res.playGroups.first.urls.length} 集',
-                                    style: TextStyle(fontSize: 10, color: theme.colorScheme.secondary),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isSelected
+                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
+                                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    ),
                                   ),
                                   if (score != null)
                                     Text(
                                       '⭐ ${score.toStringAsFixed(1)}',
                                       style: TextStyle(
                                         fontSize: 10,
-                                        color: theme.primaryColor,
+                                        color: isSelected
+                                            ? theme.colorScheme.onPrimary
+                                            : theme.primaryColor,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -961,11 +957,22 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.speed, size: 10, color: Colors.green),
+                                  Icon(
+                                    Icons.speed,
+                                    size: 10,
+                                    color: isSelected
+                                        ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
+                                        : Colors.green,
+                                  ),
                                   const SizedBox(width: 3),
                                   Text(
                                     qualityInfo.loadSpeed,
-                                    style: TextStyle(fontSize: 9, color: Colors.green),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: isSelected
+                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
+                                          : Colors.green,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -973,11 +980,22 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.network_ping, size: 10, color: Colors.orange),
+                                  Icon(
+                                    Icons.network_ping,
+                                    size: 10,
+                                    color: isSelected
+                                        ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
+                                        : Colors.orange,
+                                  ),
                                   const SizedBox(width: 3),
                                   Text(
                                     '${qualityInfo.pingTime}ms',
-                                    style: TextStyle(fontSize: 9, color: Colors.orange),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: isSelected
+                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
+                                          : Colors.orange,
+                                    ),
                                   ),
                                 ],
                               ),

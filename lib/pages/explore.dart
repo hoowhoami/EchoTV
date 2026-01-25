@@ -27,6 +27,14 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
   bool hasMore = true;
   int currentPage = 0;
 
+  // Calculate number of grid columns based on available width.
+  int _calculateCrossAxisCount(double width) {
+    if (width >= 1800) return 5;
+    if (width >= 1400) return 4;
+    if (width >= 1024) return 3;
+    return 2; // mobile
+  }
+
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -204,7 +212,19 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth > 1200 ? 6 : (screenWidth > 800 ? 4 : 3);
+    // Desktop-friendly: use a responsive grid with multiple columns on larger screens.
+    // Breakpoints: >=1800px -> 5 cols, >=1400px -> 4 cols, >=1024px -> 3 cols, else 2 cols
+    // Desktop-friendly: increase columns on larger screens to avoid cramped cards.
+    // PC testing: expect 3–4+ columns on common desktops.
+    final crossAxisCount = screenWidth >= 1920
+        ? 6
+        : screenWidth >= 1600
+            ? 5
+            : screenWidth >= 1280
+                ? 4
+                : screenWidth >= 1024
+                    ? 3
+                    : 2;
     final horizontalPadding = screenWidth > 800 ? 48.0 : 24.0;
 
     return Scaffold(
@@ -214,21 +234,17 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
         slivers: [
           SliverAppBar(
             backgroundColor: Colors.transparent,
-            expandedHeight: 100,
             floating: true,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              title: Text(
-                widget.title,
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 24),
-              ),
+            title: Text(
+              widget.title,
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 24),
             ),
           ),
 
           // 筛选器
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
               child: DoubanSelector(
                 type: widget.type,
                 primarySelection: primarySelection,
@@ -282,11 +298,11 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
             )
           else
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+              padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding - 8, top: 16, bottom: 16),
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
-                  childAspectRatio: 0.65,
+                  childAspectRatio: 160 / 240, // 与首页卡片尺寸一致 (宽160, 高约240)
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 24,
                 ),
