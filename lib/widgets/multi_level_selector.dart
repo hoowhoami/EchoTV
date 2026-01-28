@@ -211,7 +211,9 @@ class _MultiLevelSelectorState extends State<MultiLevelSelector> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: categories.map((category) {
           final key = category.key;
           final isActive = _activeCategory == key;

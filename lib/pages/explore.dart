@@ -27,13 +27,6 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
   bool hasMore = true;
   int currentPage = 0;
 
-  // Calculate number of grid columns based on available width.
-  int _calculateCrossAxisCount(double width) {
-    if (width >= 1800) return 5;
-    if (width >= 1400) return 4;
-    if (width >= 1024) return 3;
-    return 2; // mobile
-  }
 
   final ScrollController _scrollController = ScrollController();
 
@@ -212,19 +205,6 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    // Desktop-friendly: use a responsive grid with multiple columns on larger screens.
-    // Breakpoints: >=1800px -> 5 cols, >=1400px -> 4 cols, >=1024px -> 3 cols, else 2 cols
-    // Desktop-friendly: increase columns on larger screens to avoid cramped cards.
-    // PC testing: expect 3–4+ columns on common desktops.
-    final crossAxisCount = screenWidth >= 1920
-        ? 6
-        : screenWidth >= 1600
-            ? 5
-            : screenWidth >= 1280
-                ? 4
-                : screenWidth >= 1024
-                    ? 3
-                    : 2;
     final horizontalPadding = screenWidth > 800 ? 48.0 : 24.0;
 
     return Scaffold(
@@ -300,9 +280,9 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
             SliverPadding(
               padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding - 8, top: 16, bottom: 16),
               sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: 160 / 240, // 与首页卡片尺寸一致 (宽160, 高约240)
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 200, // 卡片最大宽度
+                  childAspectRatio: 160 / 240, // 保持宽高比 (宽160, 高约240)
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 24,
                 ),

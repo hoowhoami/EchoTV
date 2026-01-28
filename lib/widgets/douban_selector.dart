@@ -90,6 +90,7 @@ class _DoubanSelectorState extends State<DoubanSelector> {
   ) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
@@ -97,6 +98,7 @@ class _DoubanSelectorState extends State<DoubanSelector> {
           borderRadius: BorderRadius.circular(25),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: options.map((option) {
             final isActive = activeValue == option['value'];
             return Padding(
@@ -147,7 +149,7 @@ class _DoubanSelectorState extends State<DoubanSelector> {
                 width: 48,
                 child: Text('分类', style: TextStyle(fontSize: 13)),
               ),
-              Expanded(
+              Flexible(
                 child: _buildCapsuleSelector(
                   primaryOptions,
                   widget.primarySelection,
@@ -170,7 +172,7 @@ class _DoubanSelectorState extends State<DoubanSelector> {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              Expanded(
+              Flexible(
                 child: _buildCapsuleSelector(
                   secondaryOptions,
                   widget.secondarySelection,
@@ -188,7 +190,7 @@ class _DoubanSelectorState extends State<DoubanSelector> {
                 width: 48,
                 child: Text('筛选', style: TextStyle(fontSize: 13)),
               ),
-              Expanded(
+              Flexible(
                 child: MultiLevelSelector(
                   contentType: widget.type,
                   onChange: (values) {

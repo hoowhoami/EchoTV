@@ -64,58 +64,62 @@ class MainLayout extends StatelessWidget {
             left: 20,
             right: 20,
             child: Center(
-              child: ZenGlassContainer(
-                borderRadius: 40,
-                blur: 30,
-                child: Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: navItems.map((item) {
-                      final isActive = currentPath == item['path'];
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: ZenGlassContainer(
+                  borderRadius: 40,
+                  blur: 30,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: navItems.map((item) {
+                        final isActive = currentPath == item['path'];
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: GestureDetector(
-                          onTap: () => context.go(item['path'] as String),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                ? (isDark ? Colors.white : Colors.black)
-                                : Colors.transparent,
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  item['icon'] as IconData,
-                                  size: 18,
-                                  color: isActive
-                                    ? (isDark ? Colors.black : Colors.white)
-                                    : Theme.of(context).colorScheme.secondary,
-                                ),
-                                if (isActive) ...[
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    item['label'] as String,
-                                    style: TextStyle(
-                                      color: isDark ? Colors.black : Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: GestureDetector(
+                            onTap: () => context.go(item['path'] as String),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                  ? (isDark ? Colors.white : Colors.black)
+                                  : Colors.transparent,
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    item['icon'] as IconData,
+                                    size: 18,
+                                    color: isActive
+                                      ? (isDark ? Colors.black : Colors.white)
+                                      : Theme.of(context).colorScheme.secondary,
                                   ),
-                                ]
-                              ],
+                                  if (isActive) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      item['label'] as String,
+                                      style: TextStyle(
+                                        color: isDark ? Colors.black : Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ]
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                      ),
                     ),
                   ),
                 ),

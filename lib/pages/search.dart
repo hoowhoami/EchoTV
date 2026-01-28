@@ -86,8 +86,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 200, // 卡片最大宽度
                   childAspectRatio: 0.75,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 24,
