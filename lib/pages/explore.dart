@@ -10,7 +10,7 @@ class ExplorePage extends ConsumerStatefulWidget {
   final String title;
   final String type;
 
-  const ExplorePage({Key? key, required this.title, required this.type}) : super(key: key);
+  const ExplorePage({super.key, required this.title, required this.type});
 
   @override
   ConsumerState<ExplorePage> createState() => _ExplorePageState();
@@ -204,8 +204,21 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
 
   @override
   Widget build(BuildContext context) {
+    const gridSpacing = 16.0;
+    // 调整宽高比，为文本和间距预留空间
+    // 图片占 2:3，文本约需 50px，所以整体宽高比要小于 2/3
+    const posterAspectRatio = 0.53;
+
     final screenWidth = MediaQuery.of(context).size.width;
     final horizontalPadding = screenWidth > 800 ? 48.0 : 24.0;
+    final availableWidth = screenWidth - 2 * horizontalPadding;
+
+    // 根据屏幕宽度决定列数
+    final crossAxisCount = availableWidth > 600
+        ? 4  // 平板/大屏手机
+        : availableWidth > 400
+            ? 3  // 普通手机横屏/大屏手机
+            : 2; // 小屏手机
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -280,11 +293,11 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
             SliverPadding(
               padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding - 8, top: 16, bottom: 16),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 200, // 卡片最大宽度
-                  childAspectRatio: 160 / 240, // 保持宽高比 (宽160, 高约240)
-                  crossAxisSpacing: 16,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: gridSpacing,
                   mainAxisSpacing: 24,
+                  childAspectRatio: posterAspectRatio,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => MovieCard(

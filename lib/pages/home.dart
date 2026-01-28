@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/douban_service.dart';
 import '../models/movie.dart';
+import '../widgets/zen_ui.dart';
 import 'video_detail.dart';
 import 'package:go_router/go_router.dart';
 
@@ -90,7 +91,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
         SizedBox(
-          height: 280,
+          height: 260, // 增加高度以适应 MovieCard 的内容（图片210px + 间距和文本约40px）
           child: data.when(
             data: (movies) => Stack(
               children: [
@@ -102,60 +103,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                   itemCount: movies.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 160,
+                      width: 140,
                       margin: EdgeInsets.only(right: index < movies.length - 1 ? 16 : 0),
-                      child: GestureDetector(
+                      child: MovieCard(
+                        movie: movies[index],
                         onTap: () => _handleMovieTap(context, movies[index]),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: CachedNetworkImage(
-                                    imageUrl: movies[index].cover,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(color: Colors.grey[200]),
-                                    errorWidget: (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(child: Icon(Icons.error, color: Colors.grey)),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              movies[index].title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '⭐ ${movies[index].rate}',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.secondary,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     );
                   },
@@ -228,11 +180,13 @@ class _HomePageState extends ConsumerState<HomePage> {
               itemCount: 8,
               itemBuilder: (context, index) {
                 return Container(
-                  width: 160,
+                  width: 140,
                   margin: EdgeInsets.only(right: index < 7 ? 16 : 0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
+                      AspectRatio(
+                        aspectRatio: 2 / 3,
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.grey[300],

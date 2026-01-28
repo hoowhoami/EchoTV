@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/movie.dart';
+import 'cover_image.dart';
 
 class ZenButton extends StatefulWidget {
   final Widget child;
@@ -105,47 +107,22 @@ class ZenGlassContainer extends StatelessWidget {
   }
 }
 
-class MovieCard extends StatelessWidget {
+class MovieCard extends ConsumerWidget {
   final DoubanSubject movie;
   final VoidCallback onTap;
 
   const MovieCard({Key? key, required this.movie, required this.onTap}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: movie.cover,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(color: Colors.grey[200]),
-                  errorWidget: (context, url, error) => AspectRatio(
-                    aspectRatio: 2 / 3,
-                    child: Container(
-                      color: Colors.grey[200],
-                      child: const Center(child: Icon(Icons.error, color: Colors.grey)),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: CoverImage(imageUrl: movie.cover),
           ),
           const SizedBox(height: 8),
           Text(
@@ -153,7 +130,7 @@ class MovieCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontWeight: FontWeight.bold, 
+              fontWeight: FontWeight.bold,
               fontSize: 13,
               color: Theme.of(context).colorScheme.primary,
             ),
@@ -161,8 +138,8 @@ class MovieCard extends StatelessWidget {
           Text(
             '⭐ ${movie.rate}',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.secondary, 
-              fontSize: 11, 
+              color: Theme.of(context).colorScheme.secondary,
+              fontSize: 11,
               fontWeight: FontWeight.bold
             ),
           ),

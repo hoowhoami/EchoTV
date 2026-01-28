@@ -21,6 +21,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _doubanProxy = 'tencent-cmlius';
+  String _doubanImageProxy = 'cmliussss-cdn-tencent';
   String _siteName = 'EchoTV';
 
   @override
@@ -32,11 +33,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void _loadSettings() async {
     final service = ref.read(configServiceProvider);
     final doubanProxy = await service.getDoubanProxyType();
+    final doubanImageProxy = await service.getDoubanImageProxyType();
     final siteName = await service.getSiteName();
 
     if (mounted) {
       setState(() {
         _doubanProxy = doubanProxy;
+        _doubanImageProxy = doubanImageProxy;
         _siteName = siteName;
       });
     }
@@ -214,8 +217,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                   _buildSettingItem(
                     icon: Icons.language_outlined,
-                    title: '豆瓣代理',
-                    showDivider: false,
+                    title: '豆瓣 API 代理',
                     trailing: DropdownButton<String>(
                       value: _doubanProxy,
                       underline: const SizedBox(),
@@ -236,6 +238,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         DropdownMenuItem(value: 'tencent-cmlius', child: Text('腾讯云镜像')),
                         DropdownMenuItem(value: 'aliyun-cmlius', child: Text('阿里云镜像')),
                         DropdownMenuItem(value: 'none', child: Text('直连')),
+                      ],
+                    ),
+                  ),
+                  _buildSettingItem(
+                    icon: Icons.image_outlined,
+                    title: '豆瓣图片代理',
+                    showDivider: false,
+                    trailing: DropdownButton<String>(
+                      value: _doubanImageProxy,
+                      underline: const SizedBox(),
+                      dropdownColor: Theme.of(context).cardColor,
+                      iconEnabledColor: Theme.of(context).colorScheme.primary,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      onChanged: (type) async {
+                        if (type != null) {
+                          await ref.read(configServiceProvider).setDoubanImageProxyType(type);
+                          _loadSettings();
+                        }
+                      },
+                      items: const [
+                        DropdownMenuItem(value: 'cmliussss-cdn-tencent', child: Text('腾讯云 CDN')),
+                        DropdownMenuItem(value: 'cmliussss-cdn-ali', child: Text('阿里云 CDN')),
+                        DropdownMenuItem(value: 'img3', child: Text('豆瓣官方 CDN')),
+                        DropdownMenuItem(value: 'direct', child: Text('直连')),
                       ],
                     ),
                   ),

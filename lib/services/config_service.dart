@@ -13,6 +13,7 @@ class ConfigService {
   static const String keyCategories = 'custom_categories';
   static const String keyThemeMode = 'theme_mode';
   static const String keyDoubanProxy = 'douban_proxy_type';
+  static const String keyDoubanImageProxy = 'douban_image_proxy_type';
   static const String keySiteName = 'site_name';
   static const String keyAnnouncement = 'announcement';
   static const String keyFavorites = 'favorites';
@@ -92,12 +93,43 @@ class ConfigService {
 
   Future<String> getDoubanProxyType() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(keyDoubanProxy) ?? 'tencent-cmlius';
+    return prefs.getString(keyDoubanProxy) ?? 'tencent-cmlius'; // 默认腾讯云镜像
   }
 
   Future<void> setDoubanProxyType(String type) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(keyDoubanProxy, type);
+  }
+
+  Future<String> getDoubanImageProxyType() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(keyDoubanImageProxy) ?? 'cmliussss-cdn-tencent'; // 默认腾讯云镜像，与 API 代理一致
+  }
+
+  Future<void> setDoubanImageProxyType(String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyDoubanImageProxy, type);
+  }
+
+  /// 处理豆瓣图片 URL，根据配置的代理类型进行转换
+  Future<String> processImageUrl(String originalUrl) async {
+    if (originalUrl.isEmpty || !originalUrl.contains('doubanio.com')) {
+      return originalUrl;
+    }
+
+    final proxyType = await getDoubanImageProxyType();
+
+    switch (proxyType) {
+      case 'img3':
+        return originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img3.doubanio.com');
+      case 'cmliussss-cdn-tencent':
+        return originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.net');
+      case 'cmliussss-cdn-ali':
+        return originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.com');
+      case 'direct':
+      default:
+        return originalUrl;
+    }
   }
 
   Future<List<Favorite>> getFavorites() async {

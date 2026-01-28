@@ -43,6 +43,22 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    const pagePadding = 24.0;
+    const gridSpacing = 16.0;
+    // 调整宽高比，为文本和间距预留空间
+    // 图片占 2:3，文本约需 50px，所以整体宽高比要小于 2/3
+    const posterAspectRatio = 0.53;
+
+    // 获取屏幕宽度（减去左右内边距）
+    final screenWidth = MediaQuery.of(context).size.width - 2 * pagePadding;
+
+    // 根据屏幕宽度决定列数
+    final crossAxisCount = screenWidth > 600
+        ? 4  // 平板/大屏手机
+        : screenWidth > 400
+            ? 3  // 普通手机横屏/大屏手机
+            : 2; // 小屏手机
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
@@ -86,52 +102,29 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 200, // 卡片最大宽度
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 16,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: gridSpacing,
                   mainAxisSpacing: 24,
+                  childAspectRatio: posterAspectRatio,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = _results[index];
-                    return GestureDetector(
-                      onTap: () async {
-                        // 将 VideoDetail 臨時转换为 DoubanSubject 以适配详情页
-                        final subject = DoubanSubject(
-                          id: item.id,
-                          title: item.title,
-                          rate: '0.0',
-                          cover: item.poster,
-                          year: item.year,
-                        );
-                        Navigator.of(context).push(MaterialPageRoute(
+                    // 将 VideoDetail 转换为 DoubanSubject 以适配 MovieCard
+                    final subject = DoubanSubject(
+                      id: item.id,
+                      title: item.title,
+                      rate: '0.0',
+                      cover: item.poster,
+                      year: item.year,
+                    );
+                    return MovieCard(
+                      movie: subject,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
                           builder: (context) => VideoDetailPage(subject: subject),
-                        ));
-                      },
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: item.poster.isNotEmpty 
-                                ? Image.network(item.poster, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: Colors.grey[900]))
-                                : Container(color: Colors.grey[900]),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          Text(
-                            '${item.sourceName} • ${item.year ?? "未知"}',
-                            style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 11),
-                          ),
-                        ],
+                        ),
                       ),
                     );
                   },

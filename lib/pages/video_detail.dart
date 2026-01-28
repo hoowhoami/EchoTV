@@ -10,6 +10,7 @@ import '../services/config_service.dart';
 import '../services/video_quality_service.dart';
 import '../services/source_optimizer_service.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/cover_image.dart';
 
 class VideoDetailPage extends ConsumerStatefulWidget {
   final DoubanSubject subject;
@@ -416,19 +417,16 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       borderRadius: BorderRadius.circular(16),
       child: AspectRatio(
         aspectRatio: 2 / 3,
-        child: Image.network(
-          widget.subject.cover,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: Icon(
-                Icons.movie,
-                size: 48,
-                color: theme.colorScheme.secondary,
-              ),
-            );
-          },
+        child: CoverImage(
+          imageUrl: widget.subject.cover,
+          errorWidget: Container(
+            color: theme.colorScheme.surfaceContainerHighest,
+            child: Icon(
+              Icons.movie,
+              size: 48,
+              color: theme.colorScheme.secondary,
+            ),
+          ),
         ),
       ),
     );
@@ -572,7 +570,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                 Positioned.fill(
                   child: Stack(
                     children: [
-                      Positioned.fill(child: Image.network(widget.subject.cover, fit: BoxFit.cover)),
+                      Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
                       Container(color: Colors.black.withValues(alpha: 0.5)),
                       Center(
                         child: _isSearching
@@ -635,7 +633,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
               Positioned.fill(
                 child: Stack(
                   children: [
-                    Positioned.fill(child: Image.network(widget.subject.cover, fit: BoxFit.cover)),
+                    Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
                     Container(color: Colors.black.withValues(alpha: 0.5)),
                     Center(
                       child: _isSearching
