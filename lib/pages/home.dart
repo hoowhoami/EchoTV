@@ -234,10 +234,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           SliverAppBar(
             backgroundColor: Colors.transparent,
             floating: true,
-            title: Text(
+            title: isPC ? null : Text(
               'ECHOTV',
               style: theme.textTheme.displayMedium?.copyWith(
-                fontSize: isPC ? 24 : 20,
+                fontSize: 20,
                 fontWeight: FontWeight.w900,
               ),
             ),
