@@ -1,7 +1,7 @@
 # 📺 EchoTV
 
 <p align="center">
-  <img src="web/favicon.png" width="128" height="128" alt="EchoTV Logo">
+  <img src="assets/icon/app_icon.svg" width="128" height="128" alt="EchoTV Logo">
   <br>
   <b>极致纯净的 Zen-iOS 风格全平台视频客户端</b>
   <br>
