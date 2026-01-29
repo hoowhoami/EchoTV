@@ -6,7 +6,7 @@
   <!-- Android 自适应图标会裁切成圆形，所以内容需要更集中 -->
   <g transform="translate(512, 512)">
     <!-- Echo 文字 -->
-    <text x="0" y="-60"
+    <text x="0" y="-10"
           font-family="Arial, sans-serif"
           font-size="140"
           font-weight="bold"
@@ -15,7 +15,7 @@
           letter-spacing="6">Echo</text>
 
     <!-- TV 文字 -->
-    <text x="0" y="90"
+    <text x="0" y="140"
           font-family="Arial, sans-serif"
           font-size="156"
           font-weight="bold"

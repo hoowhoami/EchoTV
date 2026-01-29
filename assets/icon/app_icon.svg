@@ -8,7 +8,7 @@
     <rect width="840" height="840" fill="#000000" rx="148"/>
 
     <!-- Echo 文字 -->
-    <text x="420" y="340"
+    <text x="420" y="390"
           font-family="Arial, sans-serif"
           font-size="148"
           font-weight="bold"
@@ -17,7 +17,7 @@
           letter-spacing="6">Echo</text>
 
     <!-- TV 文字 -->
-    <text x="420" y="510"
+    <text x="420" y="560"
           font-family="Arial, sans-serif"
           font-size="164"
           font-weight="bold"
