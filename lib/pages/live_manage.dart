@@ -95,37 +95,16 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            expandedHeight: isPC ? 120 : 110,
-            floating: true,
-            automaticallyImplyLeading: false,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding, bottom: 12),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(LucideIcons.chevronLeft, size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.8)),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('直播源管理', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 15 : 13, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 1),
-                  Text('管理 M3U 订阅链接', style: theme.textTheme.labelMedium?.copyWith(fontSize: 8, letterSpacing: 0.5, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
-                ],
-              ),
-            ),
+          ZenSliverAppBar(
+            title: '直播源管理',
+            subtitle: '管理 M3U 订阅链接',
             actions: [
               IconButton(onPressed: () => _showSourceDialog(), icon: const Icon(LucideIcons.plusCircle, size: 20)),
-              SizedBox(width: horizontalPadding - 16),
             ],
           ),
           
           SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 4, horizontalPadding, 16),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {

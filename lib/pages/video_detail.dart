@@ -293,8 +293,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
               // 沉浸式返回头
               SliverAppBar(
                 backgroundColor: Colors.transparent,
-                leading: Padding(
-                  padding: const EdgeInsets.all(8.0),
+                floating: true,
+                automaticallyImplyLeading: false,
+                leading: Center(
                   child: ClipOval(
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),

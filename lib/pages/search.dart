@@ -146,27 +146,13 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            expandedHeight: isPC ? 90 : 80,
-            floating: true,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding, bottom: 12),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('搜索', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 15 : 13, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 1),
-                  Text('探索海量影视资源', style: theme.textTheme.labelMedium?.copyWith(fontSize: 8, letterSpacing: 0.5, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
-                ],
-              ),
-            ),
+          const ZenSliverAppBar(
+            title: '搜索',
+            subtitle: '探索海量影视资源',
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 4, horizontalPadding, 16),
               child: _buildSearchBar(theme),
             ),
           ),

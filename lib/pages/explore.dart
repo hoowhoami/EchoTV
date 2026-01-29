@@ -209,7 +209,6 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     const gridSpacing = 16.0;
     const posterAspectRatio = 0.53;
 
-    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final horizontalPadding = screenWidth > 800 ? 48.0 : 24.0;
     final availableWidth = screenWidth - 2 * horizontalPadding;
@@ -227,52 +226,19 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            floating: true,
-            expandedHeight: isPC ? 90 : 80,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: EdgeInsets.only(
-                left: horizontalPadding, 
-                right: horizontalPadding,
-                bottom: 12,
-              ),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: isPC ? 15 : 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 1), // 极简间距
-                  Text(
-                    '来自豆瓣的精选内容',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          ZenSliverAppBar(
+            title: widget.title,
+            subtitle: '来自豆瓣的精选内容',
             actions: [
               if (!isPC) ...[
                 IconButton(
-                  onPressed: () => context.go('/search'),
+                  onPressed: () => context.push('/search'),
                   icon: const Icon(LucideIcons.search, size: 20),
                 ),
                 IconButton(
-                  onPressed: () => context.go('/settings'),
+                  onPressed: () => context.push('/settings'),
                   icon: const Icon(LucideIcons.settings, size: 20),
                 ),
-                const SizedBox(width: 8),
               ],
             ],
           ),
@@ -280,7 +246,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           // 筛选器
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 4, horizontalPadding, 16),
               child: DoubanSelector(
                 type: widget.type,
                 primarySelection: primarySelection,

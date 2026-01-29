@@ -399,11 +399,11 @@ class _HomePageState extends ConsumerState<HomePage> {
             actions: [
               if (!isPC) ...[
                 IconButton(
-                  onPressed: () => context.go('/search'),
+                  onPressed: () => context.push('/search'),
                   icon: const Icon(LucideIcons.search, size: 20),
                 ),
                 IconButton(
-                  onPressed: () => context.go('/settings'),
+                  onPressed: () => context.push('/settings'),
                   icon: const Icon(LucideIcons.settings, size: 20),
                 ),
                 const SizedBox(width: 8),

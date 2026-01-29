@@ -57,51 +57,18 @@ class _LivePageState extends ConsumerState<LivePage> {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isPC = screenWidth > 800;
-    final horizontalPadding = isPC ? 48.0 : 24.0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            expandedHeight: isPC ? 90 : 80,
-            floating: true,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: EdgeInsets.only(
-                left: horizontalPadding, 
-                right: horizontalPadding,
-                bottom: 12,
-              ),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '电视直播',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: isPC ? 15 : 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    '来自 M3U 订阅的直播源',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          ZenSliverAppBar(
+            title: '电视直播',
+            subtitle: '来自 M3U 订阅的直播源',
             actions: [
               if (_sources.length > 1)
                 PopupMenuButton<LiveSource>(
-                  icon: Icon(Icons.playlist_play, color: theme.colorScheme.primary),
+                  icon: Icon(LucideIcons.listVideo, color: theme.colorScheme.primary),
                   onSelected: _loadChannels,
                   itemBuilder: (context) => _sources.map((s) => PopupMenuItem(
                     value: s,
@@ -110,14 +77,13 @@ class _LivePageState extends ConsumerState<LivePage> {
                 ),
               if (!isPC) ...[
                 IconButton(
-                  onPressed: () => context.go('/search'),
+                  onPressed: () => context.push('/search'),
                   icon: const Icon(LucideIcons.search, size: 20),
                 ),
                 IconButton(
-                  onPressed: () => context.go('/settings'),
+                  onPressed: () => context.push('/settings'),
                   icon: const Icon(LucideIcons.settings, size: 20),
                 ),
-                const SizedBox(width: 8),
               ],
             ],
           ),
@@ -125,20 +91,20 @@ class _LivePageState extends ConsumerState<LivePage> {
           if (_isLoading)
             const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.only(top: 100),
+                padding: EdgeInsets.only(top: 60),
                 child: Center(child: CircularProgressIndicator()),
               ),
             )
           else if (_channels.isEmpty)
             const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.only(top: 100),
+                padding: EdgeInsets.only(top: 60),
                 child: Center(child: Text('未发现频道，请检查源配置')),
               ),
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {

@@ -44,7 +44,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isPC = screenWidth > 800;
     final horizontalPadding = isPC ? 48.0 : 24.0;
@@ -53,47 +52,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
-          // 1. 统一风格的头部
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            expandedHeight: isPC ? 90 : 80,
-            floating: true,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: EdgeInsets.only(
-                left: horizontalPadding,
-                right: horizontalPadding,
-                bottom: 12,
-              ),
-              title: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '设置',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: isPC ? 15 : 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    '偏好设置与系统同步',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const ZenSliverAppBar(
+            title: '设置',
+            subtitle: '偏好设置与系统同步',
           ),
 
           // 2. 设置主体内容
           SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 4, horizontalPadding, 8),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _buildSectionTitle('外观与偏好'),

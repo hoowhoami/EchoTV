@@ -89,6 +89,7 @@ class ZenTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         iconTheme: IconThemeData(color: lightTextPrimary),
         titleTextStyle: TextStyle(
@@ -121,6 +122,7 @@ class ZenTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         iconTheme: IconThemeData(color: darkTextPrimary),
         titleTextStyle: TextStyle(
