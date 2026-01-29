@@ -17,7 +17,6 @@ class MainLayout extends StatelessWidget {
       builder: (context, constraints) {
         final isPC = constraints.maxWidth > 800;
 
-        // 核心导航项（移动端底部使用）
         final coreNavItems = [
           {'path': '/', 'label': '首页', 'icon': LucideIcons.home},
           {'path': '/movies', 'label': '电影', 'icon': LucideIcons.film},
@@ -27,7 +26,6 @@ class MainLayout extends StatelessWidget {
           {'path': '/live', 'label': '直播', 'icon': LucideIcons.tv},
         ];
 
-        // PC 侧边栏专用导航项（包含搜索）
         final pcNavItems = [
           {'path': '/', 'label': '首页', 'icon': LucideIcons.home},
           {'path': '/search', 'label': '搜索', 'icon': LucideIcons.search},
@@ -44,7 +42,7 @@ class MainLayout extends StatelessWidget {
             children: [
               if (isPC)
                 Container(
-                  width: 240,
+                  width: 220, // 稍微缩窄，显得更利落
                   key: const ValueKey('pc_sidebar'),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
@@ -54,46 +52,69 @@ class MainLayout extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Logo 区域 - 更加精致小巧
                         Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Text(
-                            'ECHOTV',
-                            style: theme.textTheme.displayMedium?.copyWith(
-                              fontSize: 24,
-                              letterSpacing: 1.0,
+                          padding: const EdgeInsets.fromLTRB(28, 40, 24, 32),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ECHOTV',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2.0,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 12,
+                                height: 2,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        Expanded(
+                          child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false), // 隐藏滚动条
+                            child: ListView.builder(
+                              itemCount: pcNavItems.length,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              physics: const BouncingScrollPhysics(), // 恢复滚动并增加弹性
+                              itemBuilder: (context, index) {
+                                final item = pcNavItems[index];
+                                final isActive = currentPath == item['path'];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: _SidebarItem(
+                                    icon: item['icon'] as IconData,
+                                    label: item['label'] as String,
+                                    isActive: isActive,
+                                    onTap: () => context.go(item['path'] as String),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: pcNavItems.length,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemBuilder: (context, index) {
-                              final item = pcNavItems[index];
-                              final isActive = currentPath == item['path'];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _SidebarItem(
-                                  icon: item['icon'] as IconData,
-                                  label: item['label'] as String,
-                                  isActive: isActive,
-                                  onTap: () => context.go(item['path'] as String),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const Divider(height: 1),
+                        
+                        // 底部设置区域
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: _SidebarItem(
                             icon: LucideIcons.settings,
-                            label: '设置',
+                            label: '系统设置',
                             isActive: currentPath == '/settings',
                             onTap: () => context.go('/settings'),
                           ),
                         ),
+                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
@@ -106,7 +127,6 @@ class MainLayout extends StatelessWidget {
             ],
           ),
           
-          // 移动端底部导航保持 6 个核心项
           bottomNavigationBar: isPC ? null : Container(
             key: const ValueKey('mobile_bottom_nav'),
             decoration: BoxDecoration(
@@ -158,7 +178,7 @@ class MainLayout extends StatelessWidget {
   }
 }
 
-class _SidebarItem extends StatelessWidget {
+class _SidebarItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool isActive;
@@ -172,41 +192,55 @@ class _SidebarItem extends StatelessWidget {
   });
 
   @override
+  State<_SidebarItem> createState() => _SidebarItemState();
+}
+
+class _SidebarItemState extends State<_SidebarItem> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive ? theme.colorScheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isActive 
-                  ? (isDark ? Colors.black : Colors.white) 
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive 
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: widget.isActive 
+                ? theme.colorScheme.primary 
+                : (_isHovered ? theme.colorScheme.onSurface.withValues(alpha: 0.05) : Colors.transparent),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                size: 18,
+                color: widget.isActive 
                     ? (isDark ? Colors.black : Colors.white) 
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: widget.isActive ? FontWeight.w900 : FontWeight.w500,
+                  color: widget.isActive 
+                      ? (isDark ? Colors.black : Colors.white) 
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -230,14 +230,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Row(
-            children: [
-              Icon(LucideIcons.playCircle, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              const Text('继续观看', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-            ],
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Text('继续观看', style: Theme.of(context).textTheme.titleLarge),
         ),
         SizedBox(
           height: 110, // 略微压缩高度，更精致
