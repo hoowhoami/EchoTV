@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,16 +162,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                 _buildSectionTitle('高级设置'),
                 _buildSettingGroup([
-                  _buildInfoItem(
+                  _buildActionItem(
                     icon: LucideIcons.trash2,
-                    title: '清除缓存',
-                    trailing: '12.5 MB',
+                    title: '清除所有数据并重置',
+                    onTap: _showClearDataConfirm,
                   ),
-                  _buildInfoItem(
+                  _buildNavigationItem(
                     icon: LucideIcons.info,
                     title: '关于 EchoTV',
-                    trailing: 'v1.0.0',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('v1.0.0', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 13)),
+                        const SizedBox(width: 8),
+                        Icon(LucideIcons.chevronRight, size: 14, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
+                      ],
+                    ),
                     showDivider: false,
+                    onTap: _showDisclaimer,
                   ),
                 ]),
 
@@ -286,14 +295,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildNavigationItem({Key? key, required IconData icon, required String title, required VoidCallback onTap, bool showDivider = true}) {
+  Widget _buildNavigationItem({
+    Key? key,
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Widget? trailing,
+    bool showDivider = true,
+  }) {
     return _buildBaseItem(
       key: key,
       icon: icon,
       title: title,
       onTap: onTap,
       showDivider: showDivider,
-      trailing: Icon(LucideIcons.chevronRight, size: 16, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
+      trailing: trailing ?? Icon(LucideIcons.chevronRight, size: 16, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
     );
   }
 
@@ -594,5 +610,65 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('配置已复制到剪贴板'), behavior: SnackBarBehavior.floating));
     }
+  }
+
+  void _showDisclaimer() {
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('关于与免责声明'),
+        width: 460,
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('EchoTV v1.0.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            SizedBox(height: 12),
+            Text(
+              'EchoTV 是一款纯粹的第三方聚合工具，致力于提升用户在不同平台上的视听体验。',
+              style: TextStyle(fontSize: 14, height: 1.5),
+            ),
+            SizedBox(height: 16),
+            Text('免责声明：', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text(
+              '1. 本应用不提供任何内容源，所有内容均由用户自行配置。\n'
+              '2. 应用对用户配置的内容不承担任何法律责任。\n'
+              '3. 用户应当确保所使用的资源符合当地法律法规。',
+              style: TextStyle(fontSize: 13, height: 1.6),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClearDataConfirm() {
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('确认清除数据？'),
+        content: const Text('此操作将抹除所有站点配置、直播订阅、历史记录及偏好设置。应用将恢复到初始状态并需要重新同意用户协议。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+          ),
+          TextButton(
+            onPressed: () async {
+              await ref.read(configServiceProvider).clearAllData();
+              exit(0); // 清除后退出，确保下次启动重新加载
+            },
+            child: const Text('确认清除并退出', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -12,6 +12,7 @@ class ZenButton extends StatefulWidget {
   final Color? foregroundColor;
   final double borderRadius;
   final EdgeInsets padding;
+  final double? height;
 
   const ZenButton({
     Key? key,
@@ -21,6 +22,7 @@ class ZenButton extends StatefulWidget {
     this.foregroundColor,
     this.borderRadius = 28,
     this.padding = const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+    this.height,
   }) : super(key: key);
 
   @override
@@ -41,7 +43,9 @@ class _ZenButtonState extends State<ZenButton> {
         scale: _isPressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 100),
         child: Container(
+          height: widget.height,
           padding: widget.padding,
+          alignment: widget.height != null ? Alignment.center : null,
           decoration: BoxDecoration(
             color: widget.backgroundColor ?? Theme.of(context).primaryColor,
             borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -55,7 +59,7 @@ class _ZenButtonState extends State<ZenButton> {
           ),
           child: DefaultTextStyle(
             style: TextStyle(
-              color: widget.foregroundColor ?? Colors.white,
+              color: widget.foregroundColor ?? Theme.of(context).colorScheme.onPrimary,
               fontWeight: FontWeight.bold,
             ),
             child: widget.child,

@@ -26,6 +26,22 @@ class ConfigService {
   static const String keyAnnouncement = 'announcement';
   static const String keyFavorites = 'favorites';
   static const String keyHistory = 'play_history';
+  static const String keyHasAgreedTerms = 'has_agreed_terms';
+
+  Future<bool> getHasAgreedTerms() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(keyHasAgreedTerms) ?? false;
+  }
+
+  Future<void> setHasAgreedTerms(bool agreed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(keyHasAgreedTerms, agreed);
+  }
+
+  Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
 
   Future<List<SiteConfig>> getSites() async {
     final prefs = await SharedPreferences.getInstance();
