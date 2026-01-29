@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../models/site.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/edit_dialog.dart';
 
 class SourceManagePage extends ConsumerStatefulWidget {
   const SourceManagePage({Key? key}) : super(key: key);
@@ -29,67 +30,57 @@ class _SourceManagePageState extends ConsumerState<SourceManagePage> {
   void _showSiteDialog({SiteConfig? site, int? index}) {
     final nameController = TextEditingController(text: site?.name);
     final apiController = TextEditingController(text: site?.api);
-    final isPC = MediaQuery.of(context).size.width > 800;
-
     showDialog(
       context: context,
-      builder: (context) => Center(
-        child: SizedBox(
-          width: isPC ? 500 : null,
-          child: AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            title: Text(site == null ? '添加视频源' : '编辑视频源', style: const TextStyle(fontWeight: FontWeight.bold)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController, 
-                  decoration: InputDecoration(
-                    labelText: '名称',
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: apiController, 
-                  decoration: InputDecoration(
-                    labelText: 'API 地址',
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-              TextButton(
-                onPressed: () async {
-                  if (apiController.text.isNotEmpty) {
-                    final newSite = SiteConfig(
-                      key: site?.key ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nameController.text.isEmpty ? '新站点' : nameController.text,
-                      api: apiController.text,
-                    );
-                    if (index != null) {
-                      _sites[index] = newSite;
-                    } else {
-                      _sites.add(newSite);
-                    }
-                    await ref.read(configServiceProvider).saveSites(_sites);
-                    _load();
-                    Navigator.pop(context);
-                  }
-                },
-                child: Text(site == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+      builder: (context) => EditDialog(
+        title: Text(site == null ? '添加视频源' : '编辑视频源', style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController, 
+              decoration: InputDecoration(
+                labelText: '名称',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: apiController, 
+              decoration: InputDecoration(
+                labelText: 'API 地址',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+          TextButton(
+            onPressed: () async {
+              if (apiController.text.isNotEmpty) {
+                final newSite = SiteConfig(
+                  key: site?.key ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  name: nameController.text.isEmpty ? '新站点' : nameController.text,
+                  api: apiController.text,
+                );
+                if (index != null) {
+                  _sites[index] = newSite;
+                } else {
+                  _sites.add(newSite);
+                }
+                await ref.read(configServiceProvider).saveSites(_sites);
+                _load();
+                Navigator.pop(context);
+              }
+            },
+            child: Text(site == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

@@ -7,6 +7,7 @@ import '../services/config_service.dart';
 import '../services/subscription_service.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/edit_dialog.dart';
 import 'source_manage.dart';
 import 'category_manage.dart';
 import 'live_manage.dart';
@@ -444,91 +445,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   void _showJsonImport() {
     final controller = TextEditingController();
-    final isPC = MediaQuery.of(context).size.width > 800;
-
     showDialog(
       context: context,
-      builder: (context) => Center(
-        child: Container(
-          width: isPC ? 600 : null,
-          child: AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            title: const Text('导入 JSON 配置', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: TextField(
-              controller: controller,
-              maxLines: 8,
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-              decoration: InputDecoration(
-                hintText: '粘贴符合格式的 JSON...',
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-              TextButton(
-                onPressed: () async {
-                  try {
-                    final json = jsonDecode(controller.text);
-                    await SubscriptionService(ref.read(configServiceProvider)).importFromJson(json);
-                    _loadSettings();
-                    if (mounted) Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
-                  }
-                },
-                child: Text('导入', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-              ),
-            ],
+      builder: (context) => EditDialog(
+        title: const Text('导入 JSON 配置', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          maxLines: 8,
+          style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+          decoration: InputDecoration(
+            hintText: '粘贴符合格式的 JSON...',
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+          TextButton(
+            onPressed: () async {
+              try {
+                final json = jsonDecode(controller.text);
+                await SubscriptionService(ref.read(configServiceProvider)).importFromJson(json);
+                _loadSettings();
+                if (mounted) Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
+              }
+            },
+            child: Text('导入', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
 
   void _showRemoteSync() {
     final controller = TextEditingController();
-    final isPC = MediaQuery.of(context).size.width > 800;
-
     showDialog(
       context: context,
-      builder: (context) => Center(
-        child: Container(
-          width: isPC ? 500 : null,
-          child: AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            title: const Text('同步远程订阅', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: '输入订阅 URL (JSON)',
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-              TextButton(
-                onPressed: () async {
-                  try {
-                    await SubscriptionService(ref.read(configServiceProvider)).syncFromUrl(controller.text);
-                    _loadSettings();
-                    if (mounted) Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
-                  }
-                },
-                child: Text('同步', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-              ),
-            ],
+      builder: (context) => EditDialog(
+        title: const Text('同步远程订阅', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: '输入订阅 URL (JSON)',
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+          TextButton(
+            onPressed: () async {
+              try {
+                await SubscriptionService(ref.read(configServiceProvider)).syncFromUrl(controller.text);
+                _loadSettings();
+                if (mounted) Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
+              }
+            },
+            child: Text('同步', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

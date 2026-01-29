@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../models/live.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/edit_dialog.dart';
 
 class LiveManagePage extends ConsumerStatefulWidget {
   const LiveManagePage({Key? key}) : super(key: key);
@@ -29,67 +30,57 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
   void _showSourceDialog({LiveSource? source, int? index}) {
     final nameController = TextEditingController(text: source?.name);
     final urlController = TextEditingController(text: source?.url);
-    final isPC = MediaQuery.of(context).size.width > 800;
-
     showDialog(
       context: context,
-      builder: (context) => Center(
-        child: SizedBox(
-          width: isPC ? 500 : null,
-          child: AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-            title: Text(source == null ? '添加直播源' : '编辑直播源', style: const TextStyle(fontWeight: FontWeight.bold)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: '源名称',
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: urlController,
-                  decoration: InputDecoration(
-                    labelText: 'M3U 链接',
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-              TextButton(
-                onPressed: () async {
-                  if (urlController.text.isNotEmpty) {
-                    final newSource = LiveSource(
-                      key: source?.key ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nameController.text.isEmpty ? '新直播源' : nameController.text,
-                      url: urlController.text,
-                    );
-                    if (index != null) {
-                      _sources[index] = newSource;
-                    } else {
-                      _sources.add(newSource);
-                    }
-                    await ref.read(configServiceProvider).saveLiveSources(_sources);
-                    _load();
-                    Navigator.pop(context);
-                  }
-                },
-                child: Text(source == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+      builder: (context) => EditDialog(
+        title: Text(source == null ? '添加直播源' : '编辑直播源', style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: '源名称',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: urlController,
+              decoration: InputDecoration(
+                labelText: 'M3U 链接',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+          TextButton(
+            onPressed: () async {
+              if (urlController.text.isNotEmpty) {
+                final newSource = LiveSource(
+                  key: source?.key ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  name: nameController.text.isEmpty ? '新直播源' : nameController.text,
+                  url: urlController.text,
+                );
+                if (index != null) {
+                  _sources[index] = newSource;
+                } else {
+                  _sources.add(newSource);
+                }
+                await ref.read(configServiceProvider).saveLiveSources(_sources);
+                _load();
+                Navigator.pop(context);
+              }
+            },
+            child: Text(source == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

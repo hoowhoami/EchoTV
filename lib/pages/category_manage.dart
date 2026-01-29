@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../models/site.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/edit_dialog.dart';
 
 class CategoryManagePage extends ConsumerStatefulWidget {
   const CategoryManagePage({Key? key}) : super(key: key);
@@ -30,87 +31,77 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final nameController = TextEditingController(text: cat?.name);
     final queryController = TextEditingController(text: cat?.query);
     String selectedType = cat?.type ?? 'movie';
-    final isPC = MediaQuery.of(context).size.width > 800;
-
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Center(
-          child: SizedBox(
-            width: isPC ? 500 : null,
-            child: AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-              title: Text(cat == null ? '添加分类映射' : '编辑分类映射', style: const TextStyle(fontWeight: FontWeight.bold)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: '显示名称',
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedType,
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(value: 'movie', child: Text('电影')),
-                          DropdownMenuItem(value: 'tv', child: Text('剧集')),
-                        ],
-                        onChanged: (val) => setDialogState(() => selectedType = val!),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: queryController,
-                    decoration: InputDecoration(
-                      labelText: '查询关键词 (API 参数)',
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-                TextButton(
-                  onPressed: () async {
-                    if (queryController.text.isNotEmpty) {
-                      final newCat = CustomCategory(
-                        name: nameController.text.isEmpty ? '新分类' : nameController.text,
-                        type: selectedType,
-                        query: queryController.text,
-                      );
-                      if (index != null) {
-                        _categories[index] = newCat;
-                      } else {
-                        _categories.add(newCat);
-                      }
-                      await ref.read(configServiceProvider).saveCategories(_categories);
-                      _load();
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: Text(cat == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+        builder: (context, setDialogState) => EditDialog(
+          title: Text(cat == null ? '添加分类映射' : '编辑分类映射', style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: '显示名称',
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedType,
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(value: 'movie', child: Text('电影')),
+                      DropdownMenuItem(value: 'tv', child: Text('剧集')),
+                    ],
+                    onChanged: (val) => setDialogState(() => selectedType = val!),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: queryController,
+                decoration: InputDecoration(
+                  labelText: '查询关键词 (API 参数)',
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+            TextButton(
+              onPressed: () async {
+                if (queryController.text.isNotEmpty) {
+                  final newCat = CustomCategory(
+                    name: nameController.text.isEmpty ? '新分类' : nameController.text,
+                    type: selectedType,
+                    query: queryController.text,
+                  );
+                  if (index != null) {
+                    _categories[index] = newCat;
+                  } else {
+                    _categories.add(newCat);
+                  }
+                  await ref.read(configServiceProvider).saveCategories(_categories);
+                  _load();
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(cat == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       ),
     );
