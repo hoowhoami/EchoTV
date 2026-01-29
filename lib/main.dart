@@ -111,7 +111,7 @@ final _router = GoRouter(
       path: '/play',
       pageBuilder: (context, state) {
         final params = state.uri.queryParameters;
-        return _buildPageWithFadeTransition(
+        return _buildPageWithPlatformTransition(
           state,
           PlayPage(
             videoUrl: params['url'] ?? '',
@@ -130,56 +130,56 @@ final _router = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const HomePage(),
           ),
         ),
         GoRoute(
           path: '/movies',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const ExplorePage(title: '电影', type: 'movie'),
           ),
         ),
         GoRoute(
           path: '/series',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const ExplorePage(title: '剧集', type: 'tv'),
           ),
         ),
         GoRoute(
           path: '/anime',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const ExplorePage(title: '动漫', type: 'anime'),
           ),
         ),
         GoRoute(
           path: '/variety',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const ExplorePage(title: '综艺', type: 'show'),
           ),
         ),
         GoRoute(
           path: '/live',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const LivePage(),
           ),
         ),
         GoRoute(
           path: '/search',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const SearchPage(),
           ),
         ),
         GoRoute(
           path: '/settings',
-          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+          pageBuilder: (context, state) => _buildPageWithPlatformTransition(
             state,
             const SettingsPage(),
           ),
@@ -189,34 +189,20 @@ final _router = GoRouter(
   ],
 );
 
-/// 构建带纯粹交叉淡入淡出过渡动画的页面，确保切换平滑无位移
+/// 使用系统默认的过渡动画构建页面，这会应用我们在主题中定义的 PageTransitionsTheme
 
-CustomTransitionPage _buildPageWithFadeTransition(GoRouterState state, Widget child) {
+/// 从而在 iOS/macOS 上获得 Cupertino 风格的滑动切换和左滑返回手势
 
-  return CustomTransitionPage(
+Page _buildPageWithPlatformTransition(GoRouterState state, Widget child) {
+
+  return MaterialPage(
 
     key: state.pageKey,
 
     child: child,
 
-    transitionDuration: const Duration(milliseconds: 200),
-
-    reverseTransitionDuration: const Duration(milliseconds: 200),
-
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-
-      // 使用更加平滑的渐变曲线，完全移除位移（Slide），解决视觉闪烁问题
-
-      return FadeTransition(
-
-        opacity: CurveTween(curve: Curves.easeInOut).animate(animation),
-
-        child: child,
-
-      );
-
-    },
-
   );
 
 }
+
+

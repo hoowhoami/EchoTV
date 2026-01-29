@@ -48,16 +48,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void _pushPage(Widget page) {
     Navigator.push(
       context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: CurveTween(curve: Curves.easeInOut).animate(animation),
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 200),
-      ),
+      MaterialPageRoute(builder: (context) => page),
     );
   }
 
