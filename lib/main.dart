@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/theme.dart';
 import 'services/config_service.dart';
+import 'services/update_service.dart';
 import 'widgets/edit_dialog.dart';
 import 'widgets/zen_ui.dart';
 import 'pages/home.dart';
@@ -74,10 +75,7 @@ class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener {
   @override
   void onWindowClose() async {
     if (_isDesktop) {
-      bool isPreventClose = await windowManager.isPreventClose();
-      if (isPreventClose) {
-        await windowManager.hide();
-      }
+      await windowManager.hide();
     }
   }
 
@@ -136,6 +134,10 @@ class _TermsGateState extends ConsumerState<TermsGate> {
         _hasAgreed = agreed;
         _isChecking = false;
       });
+      // 如果已同意协议，启动时静默检查更新
+      if (agreed) {
+        UpdateService.checkUpdate(context);
+      }
     }
   }
 
@@ -143,6 +145,8 @@ class _TermsGateState extends ConsumerState<TermsGate> {
     await ref.read(configServiceProvider).setHasAgreedTerms(true);
     if (mounted) {
       setState(() => _hasAgreed = true);
+      // 同意后也检查一次更新
+      UpdateService.checkUpdate(context);
     }
   }
 
@@ -151,7 +155,7 @@ class _TermsGateState extends ConsumerState<TermsGate> {
       color: Colors.black.withValues(alpha: 0.5),
       child: Center(
         child: EditDialog(
-          title: const Text('用户协议与免责声明'),
+          title: const Text('用户条款'),
           width: 460,
           content: Column(
             mainAxisSize: MainAxisSize.min,

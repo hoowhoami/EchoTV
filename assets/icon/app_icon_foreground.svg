@@ -1,0 +1,30 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- 透明背景 -->
+  <rect width="1024" height="1024" fill="none"/>
+
+  <!-- 前景内容：只包含文字，背景透明 -->
+  <!-- Android 自适应图标会裁切成圆形，所以内容需要更集中 -->
+  <g transform="translate(512, 512)">
+    <!-- Echo 文字 -->
+    <text x="0" y="-60"
+          font-family="Arial, sans-serif"
+          font-size="140"
+          font-weight="bold"
+          fill="#FFFFFF"
+          text-anchor="middle"
+          letter-spacing="6">Echo</text>
+
+    <!-- TV 文字 -->
+    <text x="0" y="90"
+          font-family="Arial, sans-serif"
+          font-size="156"
+          font-weight="bold"
+          fill="#4A9EFF"
+          text-anchor="middle"
+          letter-spacing="10">TV</text>
+
+    <!-- 装饰性波纹效果 -->
+    <circle cx="0" cy="0" r="280" fill="none" stroke="#4A9EFF" stroke-width="1.5" opacity="0.2"/>
+    <circle cx="0" cy="0" r="310" fill="none" stroke="#4A9EFF" stroke-width="0.8" opacity="0.1"/>
+  </g>
+</svg>

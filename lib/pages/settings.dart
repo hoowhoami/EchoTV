@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../services/subscription_service.dart';
+import '../services/update_service.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/zen_ui.dart';
 import '../widgets/edit_dialog.dart';
@@ -24,11 +26,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _doubanProxy = 'tencent-cmlius';
   String _doubanImageProxy = 'cmliussss-cdn-tencent';
   bool _isTeenageMode = false;
+  String _version = 'v1.0.0';
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
+  }
+
+  void _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _version = 'v${info.version}');
   }
 
   void _loadSettings() async {
@@ -168,18 +177,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     onTap: _showClearDataConfirm,
                   ),
                   _buildNavigationItem(
+                    icon: LucideIcons.shieldAlert,
+                    title: '免责声明',
+                    onTap: _showDisclaimer,
+                  ),
+                  _buildNavigationItem(
                     icon: LucideIcons.info,
                     title: '关于 EchoTV',
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('v1.0.0', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 13)),
+                        Text(_version, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 13)),
                         const SizedBox(width: 8),
                         Icon(LucideIcons.chevronRight, size: 14, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
                       ],
                     ),
                     showDivider: false,
-                    onTap: _showDisclaimer,
+                    onTap: () => UpdateService.checkUpdate(context, showNoUpdate: true),
                   ),
                 ]),
 
@@ -616,14 +630,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     showDialog(
       context: context,
       builder: (context) => EditDialog(
-        title: const Text('关于与免责声明'),
+        title: const Text('免责申明'),
         width: 460,
         content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('EchoTV v1.0.0', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            SizedBox(height: 12),
             Text(
               'EchoTV 是一款纯粹的第三方聚合工具，致力于提升用户在不同平台上的视听体验。',
               style: TextStyle(fontSize: 14, height: 1.5),
