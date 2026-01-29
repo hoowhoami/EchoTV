@@ -396,9 +396,10 @@ class _HomePageState extends ConsumerState<HomePage> {
             toolbarHeight: isPC ? 20 : 56, // PC端大幅压缩标题栏高度
             title: isPC ? null : Text(
               'ECHOTV',
-              style: theme.textTheme.displayMedium?.copyWith(
-                fontSize: 20,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
               ),
             ),
             actions: [

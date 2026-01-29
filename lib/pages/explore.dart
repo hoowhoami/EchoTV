@@ -245,16 +245,17 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
                   Text(
                     widget.title,
                     style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: isPC ? 20 : 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: isPC ? 15 : 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 4), // 拉开行间距
+                  const SizedBox(height: 1), // 极简间距
                   Text(
                     '来自豆瓣的精选内容',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 10,
+                      fontSize: 8,
                       fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                       color: theme.colorScheme.secondary.withValues(alpha: 0.5),
                     ),
                   ),

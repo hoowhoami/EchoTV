@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../models/live.dart';
 import '../widgets/zen_ui.dart';
@@ -25,86 +26,153 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
     setState(() => _sources = sources);
   }
 
-  void _addSource() {
-    final nameController = TextEditingController();
-    final urlController = TextEditingController();
+  void _showSourceDialog({LiveSource? source, int? index}) {
+    final nameController = TextEditingController(text: source?.name);
+    final urlController = TextEditingController(text: source?.url);
+    final isPC = MediaQuery.of(context).size.width > 800;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        title: const Text('添加直播源'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: '源名称'),
+      builder: (context) => Center(
+        child: SizedBox(
+          width: isPC ? 500 : null,
+          child: AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            title: Text(source == null ? '添加直播源' : '编辑直播源', style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: '源名称',
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: urlController,
+                  decoration: InputDecoration(
+                    labelText: 'M3U 链接',
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
             ),
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(labelText: 'M3U URL'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          TextButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty && urlController.text.isNotEmpty) {
-                final newSource = LiveSource(
-                  key: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: nameController.text,
-                  url: urlController.text,
-                );
-                _sources.add(newSource);
-                await ref.read(configServiceProvider).saveLiveSources(_sources);
-                _load();
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('确定'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+              TextButton(
+                onPressed: () async {
+                  if (urlController.text.isNotEmpty) {
+                    final newSource = LiveSource(
+                      key: source?.key ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                      name: nameController.text.isEmpty ? '新直播源' : nameController.text,
+                      url: urlController.text,
+                    );
+                    if (index != null) {
+                      _sources[index] = newSource;
+                    } else {
+                      _sources.add(newSource);
+                    }
+                    await ref.read(configServiceProvider).saveLiveSources(_sources);
+                    _load();
+                    Navigator.pop(context);
+                  }
+                },
+                child: Text(source == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isPC = MediaQuery.of(context).size.width > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('直播源管理', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        actions: [
-          IconButton(onPressed: _addSource, icon: const Icon(Icons.add)),
-        ],
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: _sources.length,
-        itemBuilder: (context, index) {
-          final source = _sources[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ZenGlassContainer(
-              borderRadius: 20,
-              blur: 10,
-              child: ListTile(
-                title: Text(source.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(source.url, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  onPressed: () async {
-                    _sources.removeAt(index);
-                    await ref.read(configServiceProvider).saveLiveSources(_sources);
-                    _load();
-                  },
-                ),
+      backgroundColor: Colors.transparent,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: Colors.transparent,
+            expandedHeight: isPC ? 120 : 110,
+            floating: true,
+            automaticallyImplyLeading: false,
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding, bottom: 12),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(LucideIcons.chevronLeft, size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.8)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('直播源管理', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 15 : 13, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 1),
+                  Text('管理 M3U 订阅链接', style: theme.textTheme.labelMedium?.copyWith(fontSize: 8, letterSpacing: 0.5, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
+                ],
               ),
             ),
-          );
-        },
+            actions: [
+              IconButton(onPressed: () => _showSourceDialog(), icon: const Icon(LucideIcons.plusCircle, size: 20)),
+              SizedBox(width: horizontalPadding - 16),
+            ],
+          ),
+          
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final source = _sources[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ZenGlassContainer(
+                      borderRadius: 20,
+                      blur: 10,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        leading: Icon(LucideIcons.tv, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+                        title: Text(source.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(source.url, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(icon: const Icon(LucideIcons.edit3, size: 18), onPressed: () => _showSourceDialog(source: source, index: index)),
+                            IconButton(
+                              icon: const Icon(LucideIcons.trash2, size: 18, color: Colors.redAccent),
+                              onPressed: () async {
+                                _sources.removeAt(index);
+                                await ref.read(configServiceProvider).saveLiveSources(_sources);
+                                _load();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                childCount: _sources.length,
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
       ),
     );
   }

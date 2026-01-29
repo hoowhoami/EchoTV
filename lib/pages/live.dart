@@ -81,16 +81,17 @@ class _LivePageState extends ConsumerState<LivePage> {
                   Text(
                     '电视直播',
                     style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: isPC ? 20 : 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: isPC ? 15 : 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 1),
                   Text(
                     '来自 M3U 订阅的直播源',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 10,
+                      fontSize: 8,
                       fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                       color: theme.colorScheme.secondary.withValues(alpha: 0.5),
                     ),
                   ),

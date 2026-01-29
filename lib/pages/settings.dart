@@ -71,16 +71,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   Text(
                     '设置',
                     style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: isPC ? 20 : 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: isPC ? 15 : 13,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 1),
                   Text(
                     '偏好设置与系统同步',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 10,
+                      fontSize: 8,
                       fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
                       color: theme.colorScheme.secondary.withValues(alpha: 0.5),
                     ),
                   ),
@@ -349,31 +350,90 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   void _showSimplePicker(String title, Map<dynamic, String> options, dynamic currentVal, Function(dynamic) onSelect) {
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        constraints: BoxConstraints(
+          maxWidth: isPC ? 500 : double.infinity,
         ),
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        margin: isPC ? const EdgeInsets.only(bottom: 40) : EdgeInsets.zero,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: isPC ? BorderRadius.circular(28) : const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: isPC ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 40)] : null,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            ...options.entries.map((e) => ListTile(
-              title: Text(e.value, textAlign: TextAlign.center, style: TextStyle(
-                fontWeight: e.key == currentVal ? FontWeight.bold : FontWeight.normal,
-                color: e.key == currentVal ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
-              )),
-              onTap: () {
-                onSelect(e.key);
-                Navigator.pop(context);
-              },
-            )),
-            const SizedBox(height: 16),
+            if (!isPC) 
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(color: theme.dividerColor, borderRadius: BorderRadius.circular(2)),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            ),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: options.entries.map((e) {
+                    final isSelected = e.key == currentVal;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            onSelect(e.key);
+                            Navigator.pop(context);
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    e.value,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                      color: isSelected 
+                                          ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) 
+                                          : theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    LucideIcons.check, 
+                                    size: 18, 
+                                    color: theme.brightness == Brightness.dark ? Colors.black : Colors.white
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -384,77 +444,91 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   void _showJsonImport() {
     final controller = TextEditingController();
+    final isPC = MediaQuery.of(context).size.width > 800;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text('导入 JSON 配置', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          maxLines: 8,
-          style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-          decoration: InputDecoration(
-            hintText: '粘贴符合格式的 JSON...',
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      builder: (context) => Center(
+        child: Container(
+          width: isPC ? 600 : null,
+          child: AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            title: const Text('导入 JSON 配置', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: TextField(
+              controller: controller,
+              maxLines: 8,
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                hintText: '粘贴符合格式的 JSON...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    final json = jsonDecode(controller.text);
+                    await SubscriptionService(ref.read(configServiceProvider)).importFromJson(json);
+                    _loadSettings();
+                    if (mounted) Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
+                  }
+                },
+                child: Text('导入', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-          TextButton(
-            onPressed: () async {
-              try {
-                final json = jsonDecode(controller.text);
-                await SubscriptionService(ref.read(configServiceProvider)).importFromJson(json);
-                _loadSettings();
-                if (mounted) Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
-              }
-            },
-            child: Text('导入', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
 
   void _showRemoteSync() {
     final controller = TextEditingController();
+    final isPC = MediaQuery.of(context).size.width > 800;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text('同步远程订阅', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: '输入订阅 URL (JSON)',
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      builder: (context) => Center(
+        child: Container(
+          width: isPC ? 500 : null,
+          child: AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            title: const Text('同步远程订阅', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: '输入订阅 URL (JSON)',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await SubscriptionService(ref.read(configServiceProvider)).syncFromUrl(controller.text);
+                    _loadSettings();
+                    if (mounted) Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
+                  }
+                },
+                child: Text('同步', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-          TextButton(
-            onPressed: () async {
-              try {
-                await SubscriptionService(ref.read(configServiceProvider)).syncFromUrl(controller.text);
-                _loadSettings();
-                if (mounted) Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
-              }
-            },
-            child: Text('同步', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }

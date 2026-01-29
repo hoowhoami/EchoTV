@@ -157,9 +157,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('搜索', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 20 : 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('探索海量影视资源', style: theme.textTheme.labelMedium?.copyWith(fontSize: 10, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
+                  Text('搜索', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 15 : 13, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 1),
+                  Text('探索海量影视资源', style: theme.textTheme.labelMedium?.copyWith(fontSize: 8, letterSpacing: 0.5, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
                 ],
               ),
             ),

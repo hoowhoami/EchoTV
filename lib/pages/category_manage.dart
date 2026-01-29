@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../models/site.dart';
 import '../widgets/zen_ui.dart';
@@ -21,63 +22,95 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
   }
 
   void _load() async {
-    final categories = await ref.read(configServiceProvider).getCategories();
-    setState(() => _categories = categories);
+    final cats = await ref.read(configServiceProvider).getCategories();
+    setState(() => _categories = cats);
   }
 
-  void _addCategory() {
-    final nameController = TextEditingController();
-    final queryController = TextEditingController();
-    String type = 'movie';
+  void _showCategoryDialog({CustomCategory? cat, int? index}) {
+    final nameController = TextEditingController(text: cat?.name);
+    final queryController = TextEditingController(text: cat?.query);
+    String selectedType = cat?.type ?? 'movie';
+    final isPC = MediaQuery.of(context).size.width > 800;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: Theme.of(context).cardColor,
-          title: const Text('添加分类'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: '显示名称 (可选)'),
-              ),
-              TextField(
-                controller: queryController,
-                decoration: const InputDecoration(labelText: '查询关键字'),
-              ),
-              const SizedBox(height: 16),
-              DropdownButton<String>(
-                value: type,
-                isExpanded: true,
-                onChanged: (val) => setDialogState(() => type = val!),
-                items: const [
-                  DropdownMenuItem(value: 'movie', child: Text('电影')),
-                  DropdownMenuItem(value: 'tv', child: Text('剧集')),
+        builder: (context, setDialogState) => Center(
+          child: SizedBox(
+            width: isPC ? 500 : null,
+            child: AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+              title: Text(cat == null ? '添加分类映射' : '编辑分类映射', style: const TextStyle(fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: '显示名称',
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedType,
+                        isExpanded: true,
+                        items: const [
+                          DropdownMenuItem(value: 'movie', child: Text('电影')),
+                          DropdownMenuItem(value: 'tv', child: Text('剧集')),
+                        ],
+                        onChanged: (val) => setDialogState(() => selectedType = val!),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: queryController,
+                    decoration: InputDecoration(
+                      labelText: '查询关键词 (API 参数)',
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
                 ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-            TextButton(
-              onPressed: () async {
-                if (queryController.text.isNotEmpty) {
-                  final newCat = CustomCategory(
-                    name: nameController.text.isEmpty ? null : nameController.text,
-                    type: type,
-                    query: queryController.text,
-                  );
-                  _categories.add(newCat);
-                  await ref.read(configServiceProvider).saveCategories(_categories);
-                  _load();
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('确定'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
+                TextButton(
+                  onPressed: () async {
+                    if (queryController.text.isNotEmpty) {
+                      final newCat = CustomCategory(
+                        name: nameController.text.isEmpty ? '新分类' : nameController.text,
+                        type: selectedType,
+                        query: queryController.text,
+                      );
+                      if (index != null) {
+                        _categories[index] = newCat;
+                      } else {
+                        _categories.add(newCat);
+                      }
+                      await ref.read(configServiceProvider).saveCategories(_categories);
+                      _load();
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Text(cat == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -85,40 +118,83 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isPC = MediaQuery.of(context).size.width > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('分类管理', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        actions: [
-          IconButton(onPressed: _addCategory, icon: const Icon(Icons.add)),
-        ],
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: _categories.length,
-        itemBuilder: (context, index) {
-          final cat = _categories[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ZenGlassContainer(
-              borderRadius: 20,
-              blur: 10,
-              child: ListTile(
-                leading: Icon(cat.type == 'movie' ? Icons.movie : Icons.tv),
-                title: Text(cat.name ?? cat.query, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('查询: ${cat.query} • 类型: ${cat.type == 'movie' ? "电影" : "剧集"}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                  onPressed: () async {
-                    _categories.removeAt(index);
-                    await ref.read(configServiceProvider).saveCategories(_categories);
-                    _load();
-                  },
-                ),
+      backgroundColor: Colors.transparent,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: Colors.transparent,
+            expandedHeight: isPC ? 120 : 110,
+            floating: true,
+            automaticallyImplyLeading: false,
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding, bottom: 12),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(LucideIcons.chevronLeft, size: 16, color: theme.colorScheme.primary.withValues(alpha: 0.8)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('分类管理', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 15 : 13, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 1),
+                  Text('自定义影视分类映射规则', style: theme.textTheme.labelMedium?.copyWith(fontSize: 8, letterSpacing: 0.5, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
+                ],
               ),
             ),
-          );
-        },
+            actions: [
+              IconButton(onPressed: () => _showCategoryDialog(), icon: const Icon(LucideIcons.plusCircle, size: 20)),
+              SizedBox(width: horizontalPadding - 16),
+            ],
+          ),
+          
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final cat = _categories[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ZenGlassContainer(
+                      borderRadius: 20,
+                      blur: 10,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        leading: Icon(cat.type == 'movie' ? LucideIcons.film : LucideIcons.clapperboard, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+                        title: Text(cat.name ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Query: ${cat.query}', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(icon: const Icon(LucideIcons.edit3, size: 18), onPressed: () => _showCategoryDialog(cat: cat, index: index)),
+                            IconButton(
+                              icon: const Icon(LucideIcons.trash2, size: 18, color: Colors.redAccent),
+                              onPressed: () async {
+                                _categories.removeAt(index);
+                                await ref.read(configServiceProvider).saveCategories(_categories);
+                                _load();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                childCount: _categories.length,
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
       ),
     );
   }
