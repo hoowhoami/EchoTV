@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write  # 允许创建 release 和上传文件
+
 jobs:
   build:
     name: Build ${{ matrix.target }}
@@ -16,32 +19,32 @@ jobs:
           - target: Android
             os: ubuntu-latest
             build_cmd: flutter build apk --release
-            artifact_name: echotv-${{ github.ref_name }}-android.apk
             artifact_path: build/app/outputs/flutter-apk/app-release.apk
+            artifact_ext: apk
 
           - target: macOS
             os: macos-latest
             build_cmd: flutter build macos --release
-            artifact_name: echotv-${{ github.ref_name }}-macos.zip
             artifact_path: build/macos/Build/Products/Release/echotv.app
+            artifact_ext: dmg
 
           - target: iOS
             os: macos-latest
             build_cmd: flutter build ios --release --no-codesign
-            artifact_name: echotv-${{ github.ref_name }}-ios.ipa
             artifact_path: build/ios/iphoneos/Runner.app
+            artifact_ext: ipa
 
           - target: Windows
             os: windows-latest
             build_cmd: flutter build windows --release
-            artifact_name: echotv-${{ github.ref_name }}-windows.zip
             artifact_path: build/windows/x64/runner/Release
+            artifact_ext: zip
 
           - target: Linux
             os: ubuntu-latest
             build_cmd: flutter build linux --release
-            artifact_name: echotv-${{ github.ref_name }}-linux.tar.gz
             artifact_path: build/linux/x64/release/bundle
+            artifact_ext: tar.gz
 
     steps:
       - name: Checkout code
@@ -72,18 +75,48 @@ jobs:
       - name: Build Application
         run: ${{ matrix.build_cmd }}
 
-      - name: Prepare Artifacts (macOS/iOS)
-        if: matrix.target == 'macOS' || matrix.target == 'iOS'
+      - name: Set artifact name
+        id: artifact
+        shell: bash
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          ARTIFACT_NAME="echotv-${TAG_NAME}-${{ matrix.target }}"
+          echo "name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          echo "full_name=${ARTIFACT_NAME}.${{ matrix.artifact_ext }}" >> $GITHUB_OUTPUT
+
+      - name: Install create-dmg (macOS)
+        if: matrix.target == 'macOS'
+        run: brew install create-dmg
+
+      - name: Prepare Artifacts (macOS)
+        if: matrix.target == 'macOS'
         run: |
           if [ -d "${{ matrix.artifact_path }}" ]; then
-            if [ "${{ matrix.target }}" == "iOS" ]; then
-              mkdir Payload
-              cp -r ${{ matrix.artifact_path }} Payload/
-              zip -r ${{ matrix.artifact_name }} Payload
-            else
-              cd $(dirname ${{ matrix.artifact_path }})
-              zip -r ../../../../${{ matrix.artifact_name }} $(basename ${{ matrix.artifact_path }})
-            fi
+            # 创建 DMG
+            create-dmg \
+              --volname "EchoTV" \
+              --volicon "${{ matrix.artifact_path }}/Contents/Resources/AppIcon.icns" \
+              --window-pos 200 120 \
+              --window-size 600 400 \
+              --icon-size 100 \
+              --icon "echotv.app" 175 190 \
+              --hide-extension "echotv.app" \
+              --app-drop-link 425 190 \
+              --no-internet-enable \
+              "${{ steps.artifact.outputs.full_name }}" \
+              "${{ matrix.artifact_path }}"
+          else
+            echo "Artifact not found at ${{ matrix.artifact_path }}"
+            exit 1
+          fi
+
+      - name: Prepare Artifacts (iOS)
+        if: matrix.target == 'iOS'
+        run: |
+          if [ -d "${{ matrix.artifact_path }}" ]; then
+            mkdir Payload
+            cp -r ${{ matrix.artifact_path }} Payload/
+            zip -r ${{ steps.artifact.outputs.full_name }} Payload
           else
             echo "Artifact not found at ${{ matrix.artifact_path }}"
             exit 1
@@ -94,7 +127,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path "${{ matrix.artifact_path }}") {
-            Compress-Archive -Path "${{ matrix.artifact_path }}/*" -DestinationPath "${{ matrix.artifact_name }}"
+            Compress-Archive -Path "${{ matrix.artifact_path }}/*" -DestinationPath "${{ steps.artifact.outputs.full_name }}"
           } else {
             Write-Error "Artifact not found at ${{ matrix.artifact_path }}"
             exit 1
@@ -104,7 +137,7 @@ jobs:
         if: matrix.target == 'Linux'
         run: |
           if [ -d "${{ matrix.artifact_path }}" ]; then
-            tar -czvf ${{ matrix.artifact_name }} -C ${{ matrix.artifact_path }} .
+            tar -czvf ${{ steps.artifact.outputs.full_name }} -C ${{ matrix.artifact_path }} .
           else
             echo "Artifact not found at ${{ matrix.artifact_path }}"
             exit 1
@@ -113,12 +146,12 @@ jobs:
       - name: Prepare Artifacts (Android)
         if: matrix.target == 'Android'
         run: |
-          cp ${{ matrix.artifact_path }} ${{ matrix.artifact_name }}
+          cp ${{ matrix.artifact_path }} ${{ steps.artifact.outputs.full_name }}
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.artifact_name }}
+          files: ${{ steps.artifact.outputs.full_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
           fail_on_unmatched_files: true
