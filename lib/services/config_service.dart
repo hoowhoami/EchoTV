@@ -14,6 +14,7 @@ class ConfigService {
   static const String keyThemeMode = 'theme_mode';
   static const String keyDoubanProxy = 'douban_proxy_type';
   static const String keyDoubanImageProxy = 'douban_image_proxy_type';
+  static const String keyTeenageMode = 'teenage_mode';
   static const String keySiteName = 'site_name';
   static const String keyAnnouncement = 'announcement';
   static const String keyFavorites = 'favorites';
@@ -109,6 +110,16 @@ class ConfigService {
   Future<void> setDoubanImageProxyType(String type) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(keyDoubanImageProxy, type);
+  }
+
+  Future<bool> getTeenageMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(keyTeenageMode) ?? false;
+  }
+
+  Future<void> setTeenageMode(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(keyTeenageMode, enabled);
   }
 
   /// 处理豆瓣图片 URL，根据配置的代理类型进行转换

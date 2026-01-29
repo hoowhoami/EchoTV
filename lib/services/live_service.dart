@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/live.dart';
+import '../providers/settings_provider.dart';
 
 final liveServiceProvider = Provider((ref) => LiveService(ref));
 
@@ -14,7 +15,22 @@ class LiveService {
     try {
       final response = await _dio.get(url);
       final content = response.data.toString();
-      return _parseM3U(content);
+      final channels = _parseM3U(content);
+
+      final isTeenageMode = _ref.read(teenageModeProvider);
+      if (!isTeenageMode) return channels;
+
+      final filteredKeywords = [
+        'adult', 'xxx', 'porn', '成人', '福利', '伦理', '黄色', '性感', '18+', 'av', '诱惑'
+      ];
+
+      return channels.where((c) {
+        final content = '${c.name}${c.group ?? ''}'.toLowerCase();
+        for (var kw in filteredKeywords) {
+          if (content.contains(kw)) return false;
+        }
+        return true;
+      }).toList();
     } catch (e) {
       return [];
     }

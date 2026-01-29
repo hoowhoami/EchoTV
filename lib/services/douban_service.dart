@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/movie.dart';
 import 'config_service.dart';
+import '../providers/settings_provider.dart';
 
 final doubanServiceProvider = Provider((ref) => DoubanService(ref));
 

@@ -1,0 +1,101 @@
+name: Flutter Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Android
+            os: ubuntu-latest
+            build_cmd: flutter build apk --release
+            artifact_path: build/app/outputs/flutter-apk/app-release.apk
+            asset_name: EchoTV-Android.apk
+
+          - target: macOS
+            os: macos-latest
+            build_cmd: flutter build macos --release
+            artifact_path: build/macos/Build/Products/Release/EchoTV.app
+            asset_name: EchoTV-macOS.app # 之后会压缩
+
+          - target: iOS
+            os: macos-latest
+            build_cmd: flutter build ios --release --no-codesign
+            artifact_path: build/ios/iphoneos/Runner.app
+            asset_name: EchoTV-iOS.app # 之后会压缩
+
+          - target: Windows
+            os: windows-latest
+            build_cmd: flutter build windows --release
+            artifact_path: build/windows/x64/runner/Release
+            asset_name: EchoTV-Windows.zip
+
+          - target: Linux
+            os: ubuntu-latest
+            build_cmd: flutter build linux --release
+            artifact_path: build/linux/x64/release/bundle
+            asset_name: EchoTV-Linux.tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java (for Android)
+        if: matrix.target == 'Android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Linux dependencies
+        if: matrix.target == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Application
+        run: ${{ matrix.build_cmd }}
+
+      - name: Prepare Artifacts (macOS/iOS)
+        if: matrix.target == 'macOS' || matrix.target == 'iOS'
+        run: |
+          cd $(dirname ${{ matrix.artifact_path }})
+          zip -r ../../../../${{ matrix.asset_name }}.zip $(basename ${{ matrix.artifact_path }})
+
+      - name: Prepare Artifacts (Windows)
+        if: matrix.target == 'Windows'
+        run: |
+          Compress-Archive -Path "${{ matrix.artifact_path }}/*" -DestinationPath "EchoTV-Windows.zip"
+
+      - name: Prepare Artifacts (Linux)
+        if: matrix.target == 'Linux'
+        run: |
+          tar -czvf EchoTV-Linux.tar.gz -C ${{ matrix.artifact_path }} .
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            EchoTV-macOS.app.zip
+            EchoTV-iOS.app.zip
+            EchoTV-Windows.zip
+            EchoTV-Linux.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true

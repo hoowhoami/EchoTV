@@ -32,3 +32,24 @@ class ThemeModel extends Notifier<ThemeMode> {
     await configService.setThemeMode(mode);
   }
 }
+
+final teenageModeProvider = NotifierProvider<TeenageModeModel, bool>(TeenageModeModel.new);
+
+class TeenageModeModel extends Notifier<bool> {
+  @override
+  bool build() {
+    _load();
+    return false;
+  }
+
+  Future<void> _load() async {
+    final configService = ref.read(configServiceProvider);
+    state = await configService.getTeenageMode();
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    final configService = ref.read(configServiceProvider);
+    await configService.setTeenageMode(enabled);
+  }
+}

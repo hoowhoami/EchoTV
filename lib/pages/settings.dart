@@ -22,6 +22,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _doubanProxy = 'tencent-cmlius';
   String _doubanImageProxy = 'cmliussss-cdn-tencent';
+  bool _isTeenageMode = false;
 
   @override
   void initState() {
@@ -33,11 +34,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final service = ref.read(configServiceProvider);
     final doubanProxy = await service.getDoubanProxyType();
     final doubanImageProxy = await service.getDoubanImageProxyType();
+    final teenageMode = await service.getTeenageMode();
 
     if (mounted) {
       setState(() {
         _doubanProxy = doubanProxy;
         _doubanImageProxy = doubanImageProxy;
+        _isTeenageMode = teenageMode;
       });
     }
   }
@@ -80,8 +83,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: LucideIcons.image,
                     title: '豆瓣图片代理',
                     value: _getImageProxyLabel(_doubanImageProxy),
-                    showDivider: false,
                     onTap: () => _showImageProxyPicker(),
+                  ),
+                  _buildSwitchItem(
+                    icon: LucideIcons.userCheck,
+                    title: '青少年模式',
+                    value: ref.watch(teenageModeProvider),
+                    showDivider: false,
+                    onChanged: (val) => ref.read(teenageModeProvider.notifier).setEnabled(val),
                   ),
                 ]),
 
@@ -233,6 +242,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const SizedBox(width: 4),
           Icon(LucideIcons.chevronRight, size: 14, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchItem({required IconData icon, required String title, required bool value, required Function(bool) onChanged, bool showDivider = true}) {
+    return _buildBaseItem(
+      icon: icon,
+      title: title,
+      showDivider: showDivider,
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
