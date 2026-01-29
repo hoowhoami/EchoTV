@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../models/movie.dart';
@@ -122,60 +121,81 @@ class ZenSliverAppBar extends StatelessWidget {
     final isPC = MediaQuery.of(context).size.width > 800;
     final horizontalPadding = isPC ? 48.0 : 24.0;
     final canPop = Navigator.canPop(context);
+    final topPadding = MediaQuery.of(context).padding.top;
+    
+    // 采用更紧凑的固定高度，匹配“收缩后”的视觉感
+    final headerHeight = expandedHeight ?? (isPC ? 72.0 : 64.0);
 
     return SliverAppBar(
       backgroundColor: Colors.transparent,
-      expandedHeight: expandedHeight ?? (isPC ? 90 : 80),
+      surfaceTintColor: Colors.transparent,
+      expandedHeight: headerHeight,
+      toolbarHeight: headerHeight, // 确保工具栏高度也同步，防止布局偏移
       floating: true,
       pinned: false,
+      elevation: 0,
       automaticallyImplyLeading: false,
-      leading: canPop
-          ? Center(
-              child: IconButton(
-                icon: Icon(
-                  LucideIcons.chevronLeft,
-                  size: 20,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.8),
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            )
-          : null,
-      flexibleSpace: FlexibleSpaceBar(
-        centerTitle: false,
-        titlePadding: EdgeInsets.only(
-          left: canPop ? 56 : horizontalPadding,
-          right: horizontalPadding,
-          bottom: 10,
-        ),
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      flexibleSpace: Container(
+        padding: EdgeInsets.only(top: topPadding),
+        child: Row(
           children: [
-            Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontSize: isPC ? 16 : 14,
-                fontWeight: FontWeight.w900,
-                color: theme.colorScheme.primary,
+            if (canPop)
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: IconButton(
+                  icon: Icon(
+                    LucideIcons.chevronLeft,
+                    size: 24,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: canPop ? 12 : horizontalPadding,
+                  right: horizontalPadding,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: isPC ? 22 : 18,
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.onSurface,
+                        letterSpacing: -0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle.toUpperCase(),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: theme.colorScheme.secondary.withValues(alpha: 0.6),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 1), // 极小间距
-            Text(
-              subtitle,
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontSize: 8,
-                letterSpacing: 0.5,
-                color: theme.colorScheme.secondary.withValues(alpha: 0.5),
+            if (actions != null)
+              Padding(
+                padding: EdgeInsets.only(right: horizontalPadding - 12),
+                child: Row(mainAxisSize: MainAxisSize.min, children: actions!),
               ),
-            ),
           ],
         ),
       ),
-      actions: [
-        if (actions != null) ...actions!,
-        if (actions != null) SizedBox(width: horizontalPadding - 16),
-      ],
     );
   }
 }
