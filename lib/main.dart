@@ -20,11 +20,20 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/play',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final params = state.uri.queryParameters;
-        return PlayPage(
-          videoUrl: params['url'] ?? '',
-          title: params['title'] ?? '正在播放',
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: PlayPage(
+            videoUrl: params['url'] ?? '',
+            title: params['title'] ?? '正在播放',
+          ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
         );
       },
     ),
@@ -38,40 +47,92 @@ final _router = GoRouter(
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => const HomePage(),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const HomePage(),
+          ),
         ),
         GoRoute(
           path: '/movies',
-          builder: (context, state) => const ExplorePage(title: '电影', type: 'movie'),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const ExplorePage(title: '电影', type: 'movie'),
+          ),
         ),
         GoRoute(
           path: '/series',
-          builder: (context, state) => const ExplorePage(title: '剧集', type: 'tv'),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const ExplorePage(title: '剧集', type: 'tv'),
+          ),
         ),
         GoRoute(
           path: '/anime',
-          builder: (context, state) => const ExplorePage(title: '动漫', type: 'anime'),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const ExplorePage(title: '动漫', type: 'anime'),
+          ),
         ),
         GoRoute(
           path: '/variety',
-          builder: (context, state) => const ExplorePage(title: '综艺', type: 'show'),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const ExplorePage(title: '综艺', type: 'show'),
+          ),
         ),
         GoRoute(
           path: '/live',
-          builder: (context, state) => const LivePage(),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const LivePage(),
+          ),
         ),
         GoRoute(
           path: '/search',
-          builder: (context, state) => const SearchPage(),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const SearchPage(),
+          ),
         ),
         GoRoute(
           path: '/settings',
-          builder: (context, state) => const SettingsPage(),
+          pageBuilder: (context, state) => _buildPageWithFadeTransition(
+            state,
+            const SettingsPage(),
+          ),
         ),
       ],
     ),
   ],
 );
+
+/// 构建带淡入淡出过渡动画的页面
+CustomTransitionPage _buildPageWithFadeTransition(GoRouterState state, Widget child) {
+  return CustomTransitionPage(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 150),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // 使用滑动 + 淡入动画，让新页面立即覆盖旧页面
+      const begin = Offset(0.05, 0.0);
+      const end = Offset.zero;
+      const curve = Curves.easeOut;
+
+      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      final offsetAnimation = animation.drive(tween);
+
+      final fadeAnimation = CurveTween(curve: Curves.easeIn).animate(animation);
+
+      return SlideTransition(
+        position: offsetAnimation,
+        child: FadeTransition(
+          opacity: fadeAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 class EchoTVApp extends ConsumerWidget {
   const EchoTVApp({super.key});

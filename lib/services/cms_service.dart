@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -135,6 +136,45 @@ class CmsService {
     final allResults = results.expand((x) => x).where((res) => res.playGroups.isNotEmpty).toList();
 
     return allResults;
+  }
+
+  /// 流式搜索：并发搜索所有站点，每个站点有结果就立即返回
+  /// 返回的 Stream 会持续发送累积的结果列表
+  Stream<List<VideoDetail>> searchAllStream(List<SiteConfig> sites, String query) async* {
+    final activeSites = sites.where((s) => !s.disabled).toList();
+    if (activeSites.isEmpty) {
+      yield [];
+      return;
+    }
+
+    final allResults = <VideoDetail>[];
+    final controller = StreamController<List<VideoDetail>>();
+    int completedCount = 0;
+
+    // 并发搜索所有站点
+    for (var site in activeSites) {
+      search(site, query).then((siteResults) {
+        if (siteResults.isNotEmpty) {
+          // 过滤掉没有任何集数的无效资源
+          final validResults = siteResults.where((res) => res.playGroups.isNotEmpty).toList();
+          if (validResults.isNotEmpty) {
+            allResults.addAll(validResults);
+            controller.add(List.from(allResults));
+          }
+        }
+        completedCount++;
+        if (completedCount == activeSites.length) {
+          controller.close();
+        }
+      }).catchError((_) {
+        completedCount++;
+        if (completedCount == activeSites.length) {
+          controller.close();
+        }
+      });
+    }
+
+    yield* controller.stream;
   }
 
   Future<VideoDetail?> getDetail(SiteConfig site, String id) async {

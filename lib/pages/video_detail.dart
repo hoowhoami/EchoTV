@@ -63,40 +63,64 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     });
 
     final sites = await configService.getSites();
-    final results = await cmsService.searchAll(sites, widget.subject.title);
 
-    // 宽松过滤逻辑：只要标题包含关键词即可
-    final filtered = results.where((res) {
-      final sTitle = res.title.replaceAll(' ', '').toLowerCase();
-      final tTitle = widget.subject.title.replaceAll(' ', '').toLowerCase();
+    // 使用流式搜索：只要有结果就立即展示
+    bool hasSetFirstSource = false;
 
-      // 双向匹配：源标题包含搜索词 或 搜索词包含源标题
-      final match = sTitle.contains(tTitle) || tTitle.contains(sTitle);
-      return match;
-    }).toList();
+    await for (final results in cmsService.searchAllStream(sites, widget.subject.title)) {
+      if (!mounted) break;
 
-    // 基础排序：完全匹配优先，集数多优先
-    filtered.sort((a, b) {
-      final aExact = a.title.replaceAll(' ', '').toLowerCase() == widget.subject.title.replaceAll(' ', '').toLowerCase();
-      final bExact = b.title.replaceAll(' ', '').toLowerCase() == widget.subject.title.replaceAll(' ', '').toLowerCase();
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
-      return b.playGroups.first.urls.length.compareTo(a.playGroups.first.urls.length);
-    });
+      // 宽松过滤逻辑：只要标题包含关键词即可
+      final matchedResults = results.where((res) {
+        final sTitle = res.title.replaceAll(' ', '').toLowerCase();
+        final tTitle = widget.subject.title.replaceAll(' ', '').toLowerCase();
 
-    if (mounted) {
+        // 双向匹配：源标题包含搜索词 或 搜索词包含源标题
+        return sTitle.contains(tTitle) || tTitle.contains(sTitle);
+      }).toList();
+
+      // 去重：基于 source-id 组合
+      final seenKeys = <String>{};
+      final filtered = <VideoDetail>[];
+      for (var res in matchedResults) {
+        final sourceKey = '${res.source}-${res.id}';
+        if (!seenKeys.contains(sourceKey)) {
+          seenKeys.add(sourceKey);
+          filtered.add(res);
+        }
+      }
+
+      // 基础排序：完全匹配优先，集数多优先
+      filtered.sort((a, b) {
+        final aExact = a.title.replaceAll(' ', '').toLowerCase() == widget.subject.title.replaceAll(' ', '').toLowerCase();
+        final bExact = b.title.replaceAll(' ', '').toLowerCase() == widget.subject.title.replaceAll(' ', '').toLowerCase();
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return b.playGroups.first.urls.length.compareTo(a.playGroups.first.urls.length);
+      });
+
       setState(() {
         _availableSources = filtered;
-        _isSearching = false;
-        if (filtered.isNotEmpty) {
+
+        // 只要有第一个结果就立即展示并结束搜索状态
+        if (!hasSetFirstSource && filtered.isNotEmpty) {
           _currentSource = filtered.first;
+          _isSearching = false;
+          hasSetFirstSource = true;
         }
       });
 
-      // 自动优选最佳播放源
-      if (filtered.length > 1) {
+      // 当有多个源时，触发优选（只在第一次有多个源时触发）
+      if (hasSetFirstSource && filtered.length > 1 && !_isOptimizing) {
         _optimizeBestSource(filtered);
       }
+    }
+
+    // 流结束后确保搜索状态关闭
+    if (mounted) {
+      setState(() {
+        _isSearching = false;
+      });
     }
   }
 

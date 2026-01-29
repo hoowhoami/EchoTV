@@ -274,11 +274,21 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           ),
 
           if (isLoading)
-            const SliverToBoxAdapter(
-              child: Center(child: Padding(
-                padding: EdgeInsets.all(48.0),
-                child: CircularProgressIndicator(),
-              )),
+            // 骨架屏幕
+            SliverPadding(
+              padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding - 8, top: 16, bottom: 16),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: gridSpacing,
+                  mainAxisSpacing: 24,
+                  childAspectRatio: posterAspectRatio,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildSkeletonCard(Theme.of(context)),
+                  childCount: 12, // 显示 12 个骨架卡片
+                ),
+              ),
             )
           else if (movies.isEmpty)
             SliverToBoxAdapter(
@@ -332,6 +342,86 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
+    );
+  }
+
+  /// 构建骨架卡片
+  Widget _buildSkeletonCard(ThemeData theme) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: -2.0, end: 2.0),
+      duration: const Duration(milliseconds: 1500),
+      builder: (context, value, child) {
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              ],
+              stops: [
+                (value - 1).clamp(0.0, 1.0),
+                value.clamp(0.0, 1.0),
+                (value + 1).clamp(0.0, 1.0),
+              ],
+            ).createShader(bounds);
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 骨架图片
+                Expanded(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                    ),
+                  ),
+                ),
+                // 骨架文本
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 12,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 10,
+                        width: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        // 动画结束后重新开始
+        if (mounted) {
+          setState(() {});
+        }
+      },
     );
   }
 }
