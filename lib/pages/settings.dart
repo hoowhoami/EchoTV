@@ -45,6 +45,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  void _pushPage(Widget page) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurveTween(curve: Curves.easeInOut).animate(animation),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -91,13 +107,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     value: ref.watch(teenageModeProvider),
                     onChanged: (val) => ref.read(teenageModeProvider.notifier).setEnabled(val),
                   ),
-                  if (ref.watch(teenageModeProvider))
-                    _buildNavigationItem(
-                      icon: LucideIcons.filter,
-                      title: '过滤关键字管理',
-                      showDivider: false,
-                      onTap: () => _showKeywordsEditor(),
-                    ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SizeTransition(sizeFactor: animation, axisAlignment: -1.0, child: child),
+                      );
+                    },
+                    child: ref.watch(teenageModeProvider)
+                        ? _buildNavigationItem(
+                            key: const ValueKey('keywords_editor'),
+                            icon: LucideIcons.filter,
+                            title: '过滤关键字管理',
+                            showDivider: false,
+                            onTap: () => _showKeywordsEditor(),
+                          )
+                        : const SizedBox.shrink(key: ValueKey('empty')),
+                  ),
                 ]),
 
                 _buildSectionTitle('数据源管理'),
@@ -105,20 +132,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   _buildNavigationItem(
                     icon: LucideIcons.database,
                     title: '视频 CMS 站点',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SourceManagePage())),
+                    onTap: () => _pushPage(const SourceManagePage()),
                   ),
                   _buildNavigationItem(
                     icon: LucideIcons.layers,
                     title: '自定义分类映射',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryManagePage())),
+                    onTap: () => _pushPage(const CategoryManagePage()),
                   ),
                   _buildNavigationItem(
                     icon: LucideIcons.tv,
                     title: '直播 M3U 订阅',
                     showDivider: false,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LiveManagePage())),
+                    onTap: () => _pushPage(const LiveManagePage()),
                   ),
                 ]),
+
 
                 _buildSectionTitle('配置同步'),
                 _buildSettingGroup([
@@ -194,6 +222,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildBaseItem({
+    Key? key,
     required IconData icon,
     required String title,
     Widget? trailing,
@@ -201,6 +230,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     bool showDivider = true,
   }) {
     return Material(
+      key: key,
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -265,8 +295,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  Widget _buildNavigationItem({required IconData icon, required String title, required VoidCallback onTap, bool showDivider = true}) {
+  Widget _buildNavigationItem({Key? key, required IconData icon, required String title, required VoidCallback onTap, bool showDivider = true}) {
     return _buildBaseItem(
+      key: key,
       icon: icon,
       title: title,
       onTap: onTap,

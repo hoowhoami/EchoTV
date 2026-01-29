@@ -111,18 +111,12 @@ final _router = GoRouter(
       path: '/play',
       pageBuilder: (context, state) {
         final params = state.uri.queryParameters;
-        return CustomTransitionPage(
-          key: state.pageKey,
-          child: PlayPage(
+        return _buildPageWithFadeTransition(
+          state,
+          PlayPage(
             videoUrl: params['url'] ?? '',
             title: params['title'] ?? '正在播放',
           ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
         );
       },
     ),
@@ -195,30 +189,34 @@ final _router = GoRouter(
   ],
 );
 
-/// 构建带淡入淡出过渡动画的页面
+/// 构建带纯粹交叉淡入淡出过渡动画的页面，确保切换平滑无位移
+
 CustomTransitionPage _buildPageWithFadeTransition(GoRouterState state, Widget child) {
+
   return CustomTransitionPage(
+
     key: state.pageKey,
+
     child: child,
-    transitionDuration: const Duration(milliseconds: 150),
+
+    transitionDuration: const Duration(milliseconds: 200),
+
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      // 使用滑动 + 淡入动画，让新页面立即覆盖旧页面
-      const begin = Offset(0.05, 0.0);
-      const end = Offset.zero;
-      const curve = Curves.easeOut;
 
-      final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-      final offsetAnimation = animation.drive(tween);
+      // 使用更加平滑的渐变曲线，完全移除位移（Slide），解决视觉闪烁问题
 
-      final fadeAnimation = CurveTween(curve: Curves.easeIn).animate(animation);
+      return FadeTransition(
 
-      return SlideTransition(
-        position: offsetAnimation,
-        child: FadeTransition(
-          opacity: fadeAnimation,
-          child: child,
-        ),
+        opacity: CurveTween(curve: Curves.easeInOut).animate(animation),
+
+        child: child,
+
       );
+
     },
+
   );
+
 }
