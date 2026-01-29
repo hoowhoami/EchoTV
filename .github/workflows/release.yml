@@ -16,32 +16,32 @@ jobs:
           - target: Android
             os: ubuntu-latest
             build_cmd: flutter build apk --release
+            artifact_name: echotv-${{ github.ref_name }}-android.apk
             artifact_path: build/app/outputs/flutter-apk/app-release.apk
-            asset_name: EchoTV-Android.apk
 
           - target: macOS
             os: macos-latest
             build_cmd: flutter build macos --release
-            artifact_path: build/macos/Build/Products/Release/EchoTV.app
-            asset_name: EchoTV-macOS.app # 之后会压缩
+            artifact_name: echotv-${{ github.ref_name }}-macos.zip
+            artifact_path: build/macos/Build/Products/Release/echotv.app
 
           - target: iOS
             os: macos-latest
             build_cmd: flutter build ios --release --no-codesign
+            artifact_name: echotv-${{ github.ref_name }}-ios.ipa
             artifact_path: build/ios/iphoneos/Runner.app
-            asset_name: EchoTV-iOS.app # 之后会压缩
 
           - target: Windows
             os: windows-latest
             build_cmd: flutter build windows --release
+            artifact_name: echotv-${{ github.ref_name }}-windows.zip
             artifact_path: build/windows/x64/runner/Release
-            asset_name: EchoTV-Windows.zip
 
           - target: Linux
             os: ubuntu-latest
             build_cmd: flutter build linux --release
+            artifact_name: echotv-${{ github.ref_name }}-linux.tar.gz
             artifact_path: build/linux/x64/release/bundle
-            asset_name: EchoTV-Linux.tar.gz
 
     steps:
       - name: Checkout code
@@ -75,27 +75,50 @@ jobs:
       - name: Prepare Artifacts (macOS/iOS)
         if: matrix.target == 'macOS' || matrix.target == 'iOS'
         run: |
-          cd $(dirname ${{ matrix.artifact_path }})
-          zip -r ../../../../${{ matrix.asset_name }}.zip $(basename ${{ matrix.artifact_path }})
+          if [ -d "${{ matrix.artifact_path }}" ]; then
+            if [ "${{ matrix.target }}" == "iOS" ]; then
+              mkdir Payload
+              cp -r ${{ matrix.artifact_path }} Payload/
+              zip -r ${{ matrix.artifact_name }} Payload
+            else
+              cd $(dirname ${{ matrix.artifact_path }})
+              zip -r ../../../../${{ matrix.artifact_name }} $(basename ${{ matrix.artifact_path }})
+            fi
+          else
+            echo "Artifact not found at ${{ matrix.artifact_path }}"
+            exit 1
+          fi
 
       - name: Prepare Artifacts (Windows)
         if: matrix.target == 'Windows'
+        shell: pwsh
         run: |
-          Compress-Archive -Path "${{ matrix.artifact_path }}/*" -DestinationPath "EchoTV-Windows.zip"
+          if (Test-Path "${{ matrix.artifact_path }}") {
+            Compress-Archive -Path "${{ matrix.artifact_path }}/*" -DestinationPath "${{ matrix.artifact_name }}"
+          } else {
+            Write-Error "Artifact not found at ${{ matrix.artifact_path }}"
+            exit 1
+          }
 
       - name: Prepare Artifacts (Linux)
         if: matrix.target == 'Linux'
         run: |
-          tar -czvf EchoTV-Linux.tar.gz -C ${{ matrix.artifact_path }} .
+          if [ -d "${{ matrix.artifact_path }}" ]; then
+            tar -czvf ${{ matrix.artifact_name }} -C ${{ matrix.artifact_path }} .
+          else
+            echo "Artifact not found at ${{ matrix.artifact_path }}"
+            exit 1
+          fi
+
+      - name: Prepare Artifacts (Android)
+        if: matrix.target == 'Android'
+        run: |
+          cp ${{ matrix.artifact_path }} ${{ matrix.artifact_name }}
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            EchoTV-macOS.app.zip
-            EchoTV-iOS.app.zip
-            EchoTV-Windows.zip
-            EchoTV-Linux.tar.gz
+          files: ${{ matrix.artifact_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
