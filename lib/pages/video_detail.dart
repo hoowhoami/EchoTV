@@ -9,6 +9,7 @@ import '../models/site.dart';
 import '../services/cms_service.dart';
 import '../services/douban_service.dart';
 import '../services/config_service.dart';
+import '../providers/history_provider.dart';
 import '../services/video_quality_service.dart';
 import '../services/source_optimizer_service.dart';
 import '../widgets/zen_ui.dart';
@@ -96,6 +97,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           _currentSource = filtered.first;
           _isSearching = false;
           hasSetFirstSource = true;
+          // 背景初始化第一集，但不播放
+          _initializePlayer(_currentSource!.playGroups.first.urls[0], 0, autoPlay: false);
         }
       });
 
@@ -119,7 +122,11 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           _scoreMap.addAll(result.scoreMap);
           _testedSources.addAll(result.qualityInfoMap.keys);
           _isOptimizing = false;
-          if (!_isPlaying) _currentSource = result.bestSource;
+          if (!_isPlaying) {
+            _currentSource = result.bestSource;
+            // 切换到更优源的背景初始化
+             _initializePlayer(_currentSource!.playGroups.first.urls[0], 0, autoPlay: false);
+          }
         });
       }
     } catch (e) {
@@ -127,47 +134,123 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     }
   }
 
-  Future<void> _initializePlayer(String url, int index, {double? resumePosition}) async {
+  Future<void> _savePlayRecord() async {
+    if (_currentSource == null) return;
+    
+    final record = PlayRecord(
+      title: widget.subject.title,
+      sourceName: _currentSource!.sourceName,
+      cover: widget.subject.cover,
+      year: widget.subject.year ?? '',
+      index: _currentEpisodeIndex,
+      totalEpisodes: _currentSource!.playGroups.first.urls.length,
+      playTime: _videoController?.value.position.inSeconds ?? 0,
+      totalTime: _videoController?.value.duration.inSeconds ?? 0,
+      saveTime: DateTime.now().millisecondsSinceEpoch,
+      searchTitle: widget.subject.title,
+    );
+
+    // 使用 Notifier 更新状态，确保首页同步刷新
+    ref.read(historyProvider.notifier).saveRecord(record);
+  }
+
+  Future<void> _initializePlayer(String url, int index, {double? resumePosition, bool autoPlay = true}) async {
+    // 销毁旧控制器
     await _videoController?.dispose();
     _chewieController?.dispose();
 
     setState(() {
-      _isPlaying = true;
       _currentEpisodeIndex = index;
       _chewieController = null;
     });
 
     try {
       _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
+      
+      _videoController!.addListener(() {
+        if (!_videoController!.value.isInitialized) return;
+        
+        // 进度保存逻辑
+        if (_videoController!.value.isPlaying && _videoController!.value.position.inSeconds % 5 == 0) {
+          _savePlayRecord();
+        }
+
+        // 自动播放下一集逻辑
+        if (_videoController!.value.position >= _videoController!.value.duration && 
+            _videoController!.value.duration > Duration.zero &&
+            !_videoController!.value.isPlaying) {
+          _playNextEpisode();
+        }
+      });
+
       await _videoController!.initialize();
+      
       if (resumePosition != null && resumePosition > 1) {
         await _videoController!.seekTo(Duration(seconds: resumePosition.toInt()));
       }
-      _chewieController = ChewieController(
-        videoPlayerController: _videoController!,
-        autoPlay: true,
-        aspectRatio: _videoController!.value.aspectRatio,
-        allowFullScreen: true,
-        materialProgressColors: ChewieProgressColors(
-          playedColor: Theme.of(context).primaryColor,
-          handleColor: Theme.of(context).primaryColor,
-        ),
-      );
+
+      // 无论是否 autoPlay，都创建 ChewieController 以展示播放器界面
+      _createChewieController(autoPlay: autoPlay);
+      
     } catch (e) {}
     if (mounted) setState(() {});
+  }
+
+  void _createChewieController({bool autoPlay = true}) {
+    _chewieController = ChewieController(
+      videoPlayerController: _videoController!,
+      autoPlay: autoPlay,
+      aspectRatio: _videoController!.value.aspectRatio,
+      allowFullScreen: true,
+      materialProgressColors: ChewieProgressColors(
+        playedColor: Theme.of(context).primaryColor,
+        handleColor: Theme.of(context).primaryColor,
+      ),
+    );
+    // 只要有了 ChewieController，就认为进入了播放就绪状态
+    _isPlaying = true;
+    if (autoPlay) _savePlayRecord();
+  }
+
+  void _playNextEpisode() {
+    if (_currentSource == null) return;
+    final urls = _currentSource!.playGroups.first.urls;
+    final nextIndex = _currentEpisodeIndex + 1;
+    
+    if (nextIndex < urls.length) {
+      // 提示用户正在切换下一集
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('即将播放：${_currentSource!.playGroups.first.titles[nextIndex]}'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _handlePlayAction(nextIndex);
+    }
+  }
+
+  /// 点击“立即播放”或点击选集时调用
+  void _handlePlayAction(int index, {double? resumePosition}) {
+    if (_currentSource == null) return;
+    final url = _currentSource!.playGroups.first.urls[index];
+    _initializePlayer(url, index, resumePosition: resumePosition, autoPlay: true);
   }
 
   Future<void> _switchSource(VideoDetail newSource) async {
     final oldEpisodeIndex = _currentEpisodeIndex;
     final oldPlayPosition = _videoController?.value.position.inSeconds.toDouble() ?? 0.0;
     setState(() => _currentSource = newSource);
+    
     final newGroup = newSource.playGroups.first;
     int targetIndex = oldEpisodeIndex >= newGroup.urls.length ? 0 : oldEpisodeIndex;
+    
     if (_isPlaying) {
       final resumePosition = (targetIndex == oldEpisodeIndex && oldPlayPosition > 1) ? oldPlayPosition : null;
-      await _initializePlayer(newGroup.urls[targetIndex], targetIndex, resumePosition: resumePosition);
+      _handlePlayAction(targetIndex, resumePosition: resumePosition);
     } else {
-      setState(() => _currentEpisodeIndex = targetIndex);
+      // 换源但不自动播放，仅初始化
+      _initializePlayer(newGroup.urls[targetIndex], targetIndex, autoPlay: false);
     }
     _tabController.animateTo(0);
   }
@@ -312,44 +395,21 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   }
 
   Widget _buildVideoPlayer(ThemeData theme, bool isPC) {
-    final content = Stack(
-      children: [
-        if (_isPlaying)
-          Center(
-            child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
-                ? Chewie(controller: _chewieController!)
-                : const CircularProgressIndicator(),
-          )
-        else
-          Positioned.fill(
-            child: Stack(
-              children: [
-                Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
-                Container(color: Colors.black.withValues(alpha: 0.6)),
-                Center(
-                  child: _isSearching
+    final content = _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+        ? Chewie(controller: _chewieController!)
+        : Stack(
+            children: [
+              Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
+              Container(color: Colors.black.withValues(alpha: 0.6)),
+              Center(
+                child: _isSearching
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : _currentSource != null
-                      ? ZenButton(
-                          onPressed: () => _initializePlayer(_currentSource!.playGroups.first.urls[0], 0),
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(LucideIcons.play, size: 18),
-                              SizedBox(width: 8),
-                              Text('立即播放'),
-                            ],
-                          ),
-                        )
-                      : const Text('未找到资源', style: TextStyle(color: Colors.white70)),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
+                    : _currentSource == null
+                        ? const Text('未找到资源', style: TextStyle(color: Colors.white70))
+                        : const CircularProgressIndicator(color: Colors.white),
+              ),
+            ],
+          );
 
     final playerContainer = Container(
       height: isPC ? _calculatePlayerHeight(MediaQuery.of(context).size.width) : null,
@@ -499,7 +559,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         final index = _descending ? (group.urls.length - 1 - i) : i;
         final isCurrent = _currentEpisodeIndex == index && _isPlaying;
         return GestureDetector(
-          onTap: () => _initializePlayer(group.urls[index], index),
+          onTap: () => _handlePlayAction(index),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(

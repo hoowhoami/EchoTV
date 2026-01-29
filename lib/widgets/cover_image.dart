@@ -28,11 +28,14 @@ class CoverImage extends ConsumerStatefulWidget {
 
 class _CoverImageState extends ConsumerState<CoverImage> {
   String? _processedUrl;
-  bool _isLoading = false;
+  late bool _isLoading;
 
   @override
   void initState() {
     super.initState();
+    // 第一步：同步判断是否需要代理，如果是豆瓣地址，初始状态即为加载中
+    final isDouban = widget.imageUrl.isNotEmpty && widget.imageUrl.contains('doubanio.com');
+    _isLoading = isDouban;
     _processUrl();
   }
 
@@ -40,6 +43,11 @@ class _CoverImageState extends ConsumerState<CoverImage> {
   void didUpdateWidget(CoverImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.imageUrl != widget.imageUrl) {
+      final isDouban = widget.imageUrl.isNotEmpty && widget.imageUrl.contains('doubanio.com');
+      setState(() {
+        _isLoading = isDouban;
+        _processedUrl = null;
+      });
       _processUrl();
     }
   }
@@ -57,8 +65,6 @@ class _CoverImageState extends ConsumerState<CoverImage> {
       return;
     }
 
-    if (mounted) setState(() => _isLoading = true);
-    
     // 从 Provider 读取服务进行处理
     final processed = await ref.read(configServiceProvider).processImageUrl(widget.imageUrl);
     
@@ -93,6 +99,10 @@ class _CoverImageState extends ConsumerState<CoverImage> {
       child: CachedNetworkImage(
         imageUrl: finalUrl,
         fit: widget.fit,
+        // 添加 Referer 绕过豆瓣防盗链
+        httpHeaders: const {
+          'Referer': 'https://movie.douban.com/',
+        },
         // 使用 memCache 优化性能
         memCacheHeight: 600, 
         placeholder: (context, url) => loadingPlaceholder,

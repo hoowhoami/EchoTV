@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../services/douban_service.dart';
+import '../services/config_service.dart';
+import '../providers/history_provider.dart';
 import '../models/movie.dart';
+import '../models/site.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/cover_image.dart';
 import 'video_detail.dart';
 import 'package:go_router/go_router.dart';
 
@@ -217,11 +221,166 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
+  Widget _buildContinueWatching(BuildContext context, List<PlayRecord> history) {
+    if (history.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          child: Row(
+            children: [
+              Icon(LucideIcons.playCircle, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('继续观看', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 110, // 略微压缩高度，更精致
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            physics: const BouncingScrollPhysics(),
+            itemCount: history.length,
+            itemBuilder: (context, index) {
+              final record = history[index];
+              final progress = record.totalTime > 0 ? record.playTime / record.totalTime : 0.0;
+              
+              return GestureDetector(
+                onTap: () {
+                  final subject = DoubanSubject(
+                    id: '',
+                    title: record.searchTitle,
+                    rate: '0.0',
+                    cover: record.cover,
+                    year: record.year,
+                  );
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => VideoDetailPage(subject: subject),
+                  ));
+                },
+                child: Container(
+                  width: 260, // 增加宽度，排版更从容
+                  margin: const EdgeInsets.only(right: 16),
+                  child: ZenGlassContainer(
+                    borderRadius: 18,
+                    blur: 30,
+                    child: Stack(
+                      children: [
+                        // 背景微弱氛围
+                        Positioned(
+                          right: -20,
+                          top: -20,
+                          bottom: -20,
+                          width: 140,
+                          child: Opacity(
+                            opacity: 0.1,
+                            child: CoverImage(
+                              imageUrl: record.cover,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        
+                        Row(
+                          children: [
+                            // 左侧封面
+                            SizedBox(
+                              width: 74,
+                              height: 110,
+                              child: CoverImage(
+                                imageUrl: record.cover,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            
+                            // 右侧信息
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.all(14.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      record.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '观看至第 ${record.index + 1} 集',
+                                      style: TextStyle(
+                                        fontSize: 11, 
+                                        color: theme.colorScheme.secondary.withValues(alpha: 0.8),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    
+                                    // 胶囊式进度条容器
+                                    Container(
+                                      height: 4,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                      child: FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: progress.clamp(0.01, 1.0),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(2),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                                                blurRadius: 4,
+                                              )
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${(progress * 100).toInt()}% 已观看',
+                                      style: TextStyle(
+                                        fontSize: 9, 
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hotMovies = ref.watch(hotMoviesProvider);
     final hotTvShows = ref.watch(hotTvShowsProvider);
     final hotVarietyShows = ref.watch(hotVarietyShowsProvider);
+    final playHistory = ref.watch(historyProvider);
 
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -234,6 +393,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           SliverAppBar(
             backgroundColor: Colors.transparent,
             floating: true,
+            toolbarHeight: isPC ? 20 : 56, // PC端大幅压缩标题栏高度
             title: isPC ? null : Text(
               'ECHOTV',
               style: theme.textTheme.displayMedium?.copyWith(
@@ -259,13 +419,18 @@ class _HomePageState extends ConsumerState<HomePage> {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                const SizedBox(height: 16),
+                if (!isPC) const SizedBox(height: 8) else const SizedBox(height: 24),
+                playHistory.maybeWhen(
+                  data: (history) => _buildContinueWatching(context, history),
+                  orElse: () => const SizedBox.shrink(),
+                ),
+                if (playHistory.value?.isNotEmpty ?? false) const SizedBox(height: 24),
                 _buildSection(context, '热门电影', '/movies', 'movies', hotMovies),
                 const SizedBox(height: 24),
                 _buildSection(context, '热门剧集', '/series', 'series', hotTvShows),
                 const SizedBox(height: 24),
                 _buildSection(context, '热门综艺', '/variety', 'variety', hotVarietyShows),
-                const SizedBox(height: 120),
+                const SizedBox(height: 32), // 底部留白大幅减少
               ],
             ),
           ),

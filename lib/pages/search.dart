@@ -34,7 +34,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     _loadHistory();
     _controller.addListener(() {
       if (_controller.text.isEmpty && _isSearching) {
-        setState(() => _isSearching = false);
+        setState(() {
+          _isSearching = false;
+          _results = [];
+          _groupedResults = {};
+        });
       }
     });
   }

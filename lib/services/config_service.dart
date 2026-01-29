@@ -113,23 +113,44 @@ class ConfigService {
 
   /// 处理豆瓣图片 URL，根据配置的代理类型进行转换
   Future<String> processImageUrl(String originalUrl) async {
-    if (originalUrl.isEmpty || !originalUrl.contains('doubanio.com')) {
+    if (originalUrl.isEmpty) return originalUrl;
+    
+    // 如果不是豆瓣域名，直接返回
+    if (!originalUrl.contains('doubanio.com')) {
       return originalUrl;
     }
 
     final proxyType = await getDoubanImageProxyType();
 
+    // 统一处理替换逻辑
+    String url = originalUrl;
+    
     switch (proxyType) {
       case 'img3':
-        return originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img3.doubanio.com');
+        // img3 有时也需要 headers，如果还报 418，建议换成 cmlius 镜像
+        url = originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img3.doubanio.com');
+        break;
       case 'cmliussss-cdn-tencent':
-        return originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.net');
+        url = originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.net');
+        break;
       case 'cmliussss-cdn-ali':
-        return originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.com');
+        url = originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.com');
+        break;
       case 'direct':
+        // 直连通常会报 418，除非有正确的 Referer
+        url = originalUrl;
+        break;
       default:
-        return originalUrl;
+        // 兜底使用最稳定的镜像
+        url = originalUrl.replaceAll(RegExp(r'img\d+\.doubanio\.com'), 'img.doubanio.cmliussss.net');
     }
+
+    // 确保使用 https
+    if (url.startsWith('http://')) {
+      url = url.replaceFirst('http://', 'https://');
+    }
+    
+    return url;
   }
 
   Future<List<Favorite>> getFavorites() async {
