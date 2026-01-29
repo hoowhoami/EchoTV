@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/cms_service.dart';
 import '../services/config_service.dart';
 import '../models/site.dart';
@@ -16,120 +19,124 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  
   List<VideoDetail> _results = [];
-  bool _isLoading = false;
-
-  // 按源分组的结果
   Map<String, List<VideoDetail>> _groupedResults = {};
+  List<String> _history = [];
+  
+  bool _isLoading = false;
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+    _controller.addListener(() {
+      if (_controller.text.isEmpty && _isSearching) {
+        setState(() => _isSearching = false);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
-  void _handleSearch() async {
-    if (_controller.text.isEmpty) return;
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _history = prefs.getStringList('search_history') ?? [];
+    });
+  }
 
+  Future<void> _saveHistory(String query) async {
+    if (query.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    _history.remove(query);
+    _history.insert(0, query);
+    if (_history.length > 15) _history = _history.sublist(0, 15);
+    await prefs.setStringList('search_history', _history);
+    setState(() {});
+  }
+
+  Future<void> _deleteHistory(String query) async {
+    final prefs = await SharedPreferences.getInstance();
+    _history.remove(query);
+    await prefs.setStringList('search_history', _history);
+    setState(() {});
+  }
+
+  Future<void> _clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('search_history');
+    setState(() => _history = []);
+  }
+
+  void _handleSearch([String? query]) async {
+    final searchText = query ?? _controller.text.trim();
+    if (searchText.isEmpty) return;
+    
+    if (query != null) _controller.text = query;
+    _focusNode.unfocus();
+    
     setState(() {
       _isLoading = true;
+      _isSearching = true;
       _results = [];
       _groupedResults = {};
     });
+
+    _saveHistory(searchText);
 
     final cmsService = ref.read(cmsServiceProvider);
     final configService = ref.read(configServiceProvider);
     final sites = await configService.getSites();
 
-    final searchQuery = _controller.text.trim();
-
-    // 使用流式搜索：只要有结果就立即展示
-    await for (final allResults in cmsService.searchAllStream(sites, searchQuery)) {
+    await for (final allResults in cmsService.searchAllStream(sites, searchText)) {
       if (!mounted) break;
-
-      // 过滤和排序结果
-      final filteredResults = _filterAndSortResults(allResults, searchQuery);
-
-      // 按源分组
+      final filteredResults = _filterAndSortResults(allResults, searchText);
       final grouped = <String, List<VideoDetail>>{};
       for (var result in filteredResults) {
         final sourceName = result.sourceName;
-        if (!grouped.containsKey(sourceName)) {
-          grouped[sourceName] = [];
-        }
+        if (!grouped.containsKey(sourceName)) grouped[sourceName] = [];
         grouped[sourceName]!.add(result);
       }
-
       setState(() {
         _results = filteredResults;
         _groupedResults = grouped;
-        _isLoading = false; // 只要有第一个结果就结束加载状态
-      });
-    }
-
-    // 流结束后确保加载状态关闭
-    if (mounted) {
-      setState(() {
         _isLoading = false;
       });
     }
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  /// 过滤和排序搜索结果
-  /// 参考 LunaTV 的排序逻辑：完全匹配优先，年份倒序，未知年份最后
   List<VideoDetail> _filterAndSortResults(List<VideoDetail> results, String query) {
-    final normalizedQuery = query.replaceAll(' ', '').toLowerCase();
-
-    return results.where((result) {
-      // 基本过滤：标题必须包含搜索关键词（忽略空格和大小写）
-      final normalizedTitle = result.title.replaceAll(' ', '').toLowerCase();
-      return normalizedTitle.contains(normalizedQuery);
-    }).toList()
+    final q = query.replaceAll(' ', '').toLowerCase();
+    return results.where((res) => res.title.replaceAll(' ', '').toLowerCase().contains(q)).toList()
       ..sort((a, b) {
-        // 1. 完全匹配标题优先
-        final aExact = a.title.replaceAll(' ', '').toLowerCase() == normalizedQuery;
-        final bExact = b.title.replaceAll(' ', '').toLowerCase() == normalizedQuery;
+        final aExact = a.title.replaceAll(' ', '').toLowerCase() == q;
+        final bExact = b.title.replaceAll(' ', '').toLowerCase() == q;
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
-
-        // 2. 年份排序：有效年份优先，按年份倒序
-        final aYear = a.year;
-        final bYear = b.year;
-
-        final aHasYear = aYear != null && aYear.isNotEmpty && aYear != 'unknown';
-        final bHasYear = bYear != null && bYear.isNotEmpty && bYear != 'unknown';
-
-        if (aHasYear && !bHasYear) return -1;
-        if (!aHasYear && bHasYear) return 1;
-
-        if (aHasYear && bHasYear) {
-          final aYearNum = int.tryParse(aYear) ?? 0;
-          final bYearNum = int.tryParse(bYear) ?? 0;
-          return bYearNum.compareTo(aYearNum); // 年份倒序
-        }
-
-        return 0;
+        final aY = int.tryParse(a.year ?? '0') ?? 0;
+        final bY = int.tryParse(b.year ?? '0') ?? 0;
+        return bY.compareTo(aY);
       });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const pagePadding = 24.0;
-    const gridSpacing = 16.0;
-    // 调整宽高比，为文本和间距预留空间
-    // 图片占 2:3，文本约需 50px，所以整体宽高比要小于 2/3
-    const posterAspectRatio = 0.53;
-
-    // 获取屏幕宽度（减去左右内边距）
-    final screenWidth = MediaQuery.of(context).size.width - 2 * pagePadding;
-
-    // 根据屏幕宽度决定列数
-    final crossAxisCount = screenWidth > 600
-        ? 4  // 平板/大屏手机
-        : screenWidth > 400
-            ? 3  // 普通手机横屏/大屏手机
-            : 2; // 小屏手机
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+    
+    final availableWidth = screenWidth - (isPC ? 240 : 0) - (horizontalPadding * 2);
+    final crossAxisCount = availableWidth > 800 ? 5 : (availableWidth > 600 ? 4 : (availableWidth > 400 ? 3 : 2));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -137,171 +144,224 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         slivers: [
           SliverAppBar(
             backgroundColor: Colors.transparent,
+            expandedHeight: isPC ? 90 : 80,
             floating: true,
-            expandedHeight: 120,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              title: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: TextField(
-                  controller: _controller,
-                  onSubmitted: (_) => _handleSearch(),
-                  style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: '搜索电影、剧集...',
-                    hintStyle: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 14),
-                    prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.secondary, size: 20),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding, bottom: 12),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('搜索', style: theme.textTheme.titleLarge?.copyWith(fontSize: isPC ? 20 : 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('探索海量影视资源', style: theme.textTheme.labelMedium?.copyWith(fontSize: 10, color: theme.colorScheme.secondary.withValues(alpha: 0.5))),
+                ],
               ),
             ),
           ),
-
-          if (_isLoading && _results.isEmpty)
-            // 骨架屏幕
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: gridSpacing,
-                  mainAxisSpacing: 24,
-                  childAspectRatio: posterAspectRatio,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildSkeletonCard(theme),
-                  childCount: 12, // 显示 12 个骨架卡片
-                ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+              child: _buildSearchBar(theme),
+            ),
+          ),
+          if (!_isSearching)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: _buildHistorySection(theme),
               ),
             )
+          else if (_isLoading && _results.isEmpty)
+            _buildSkeletonGrid(horizontalPadding, crossAxisCount)
           else if (_groupedResults.isNotEmpty)
-            // 按源分组展示
-            ..._buildGroupedResults(crossAxisCount, gridSpacing, posterAspectRatio)
-          else if (_results.isNotEmpty)
-            // 兜底：如果没有分组数据但有结果，使用原来的展示方式
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: gridSpacing,
-                  mainAxisSpacing: 24,
-                  childAspectRatio: posterAspectRatio,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final item = _results[index];
-                    return _buildMovieCard(item);
-                  },
-                  childCount: _results.length,
-                ),
-              ),
-            ),
-
+            ..._buildGroupedSlivers(horizontalPadding, crossAxisCount)
+          else if (!_isLoading && _isSearching && _results.isEmpty)
+            _buildEmptyState(theme),
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
     );
   }
 
-  /// 构建按源分组的结果列表
-  List<Widget> _buildGroupedResults(int crossAxisCount, double gridSpacing, double posterAspectRatio) {
+  Widget _buildSearchBar(ThemeData theme) {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(width: 14),
+          Icon(LucideIcons.search, size: 18, color: theme.colorScheme.secondary.withValues(alpha: 0.7)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              onSubmitted: (val) => _handleSearch(),
+              style: const TextStyle(fontSize: 15, decoration: TextDecoration.none),
+              decoration: InputDecoration(
+                hintText: '搜索电影、剧集、综艺...',
+                hintStyle: TextStyle(color: theme.colorScheme.secondary.withValues(alpha: 0.5), fontSize: 14),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (_controller.text.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                _controller.clear();
+                setState(() => _isSearching = false);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(LucideIcons.xCircle, size: 16, color: theme.colorScheme.secondary.withValues(alpha: 0.6)),
+              ),
+            )
+          else
+            const SizedBox(width: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistorySection(ThemeData theme) {
+    if (_history.isEmpty) return const SizedBox();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('最近搜索', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            TextButton(
+              onPressed: _clearHistory,
+              child: Text('清空', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12)),
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _history.map((q) => _buildHistoryChip(theme, q)).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryChip(ThemeData theme, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => _handleSearch(text),
+            child: Text(text, style: const TextStyle(fontSize: 13)),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _deleteHistory(text),
+            child: Icon(LucideIcons.x, size: 12, color: theme.colorScheme.secondary.withValues(alpha: 0.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildGroupedSlivers(double padding, int crossAxisCount) {
     final widgets = <Widget>[];
-
-    // 按源名称排序
-    final sortedSources = _groupedResults.keys.toList()..sort();
-
-    for (var sourceName in sortedSources) {
-      final sourceResults = _groupedResults[sourceName]!;
-
-      // 源标题
+    final sortedKeys = _groupedResults.keys.toList()..sort();
+    for (var source in sortedKeys) {
+      final items = _groupedResults[source]!;
       widgets.add(
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+            padding: EdgeInsets.fromLTRB(padding, 24, padding, 12),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    sourceName,
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: Theme.of(context).primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                  child: Text(source, style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${sourceResults.length} 个结果',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontSize: 12,
-                  ),
-                ),
+                Text('${items.length} 个结果', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 11)),
               ],
             ),
           ),
         ),
       );
-
-      // 源的结果网格
       widgets.add(
         SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(horizontal: padding),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: gridSpacing,
-              mainAxisSpacing: 24,
-              childAspectRatio: posterAspectRatio,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.53,
             ),
             delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final item = sourceResults[index];
-                return _buildMovieCard(item);
-              },
-              childCount: sourceResults.length,
+              (context, index) => _buildMovieCard(items[index]),
+              childCount: items.length,
             ),
           ),
         ),
       );
     }
-
     return widgets;
   }
 
-  /// 构建单个电影卡片
-  Widget _buildMovieCard(VideoDetail item) {
-    final subject = DoubanSubject(
-      id: item.id,
-      title: item.title,
-      rate: '0.0',
-      cover: item.poster,
-      year: item.year,
+  Widget _buildSkeletonGrid(double padding, int count) {
+    return SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 16),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: count,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 0.53,
+        ),
+        delegate: SliverChildBuilderDelegate((c, i) => _buildSkeletonCard(Theme.of(c)), childCount: 10),
+      ),
     );
-    return MovieCard(
-      movie: subject,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => VideoDetailPage(subject: subject),
+  }
+
+  Widget _buildMovieCard(VideoDetail item) {
+    final subject = DoubanSubject(id: item.id, title: item.title, rate: '0.0', cover: item.poster, year: item.year);
+    return MovieCard(movie: subject, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => VideoDetailPage(subject: subject))));
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 100),
+        child: Column(
+          children: [
+            Icon(LucideIcons.searchX, size: 48, color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
+            const SizedBox(height: 16),
+            Text('未搜到匹配资源', style: TextStyle(color: theme.colorScheme.secondary)),
+          ],
         ),
       ),
     );
   }
 
-  /// 构建骨架卡片
   Widget _buildSkeletonCard(ThemeData theme) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: -2.0, end: 2.0),
@@ -317,66 +377,13 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                 theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               ],
-              stops: [
-                (value - 1).clamp(0.0, 1.0),
-                value.clamp(0.0, 1.0),
-                (value + 1).clamp(0.0, 1.0),
-              ],
+              stops: [(value - 1).clamp(0.0, 1.0), value.clamp(0.0, 1.0), (value + 1).clamp(0.0, 1.0)],
             ).createShader(bounds);
           },
           child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 骨架图片
-                Expanded(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                    ),
-                  ),
-                ),
-                // 骨架文本
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 12,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 10,
-                        width: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
           ),
         );
-      },
-      onEnd: () {
-        // 动画结束后重新开始
-        if (mounted) {
-          setState(() {});
-        }
       },
     );
   }

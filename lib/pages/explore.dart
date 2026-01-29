@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:go_router/go_router.dart';
 import '../services/douban_service.dart';
 import '../widgets/zen_ui.dart';
 import '../widgets/douban_selector.dart';
@@ -205,13 +207,13 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
   @override
   Widget build(BuildContext context) {
     const gridSpacing = 16.0;
-    // 调整宽高比，为文本和间距预留空间
-    // 图片占 2:3，文本约需 50px，所以整体宽高比要小于 2/3
     const posterAspectRatio = 0.53;
 
+    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final horizontalPadding = screenWidth > 800 ? 48.0 : 24.0;
     final availableWidth = screenWidth - 2 * horizontalPadding;
+    final isPC = screenWidth > 800;
 
     // 根据屏幕宽度决定列数
     final crossAxisCount = availableWidth > 600
@@ -228,10 +230,50 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           SliverAppBar(
             backgroundColor: Colors.transparent,
             floating: true,
-            title: Text(
-              widget.title,
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 24),
+            expandedHeight: isPC ? 90 : 80,
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(
+                left: horizontalPadding, 
+                right: horizontalPadding,
+                bottom: 12,
+              ),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: isPC ? 20 : 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4), // 拉开行间距
+                  Text(
+                    '来自豆瓣的精选内容',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              if (!isPC) ...[
+                IconButton(
+                  onPressed: () => context.go('/search'),
+                  icon: const Icon(LucideIcons.search, size: 20),
+                ),
+                IconButton(
+                  onPressed: () => context.go('/settings'),
+                  icon: const Icon(LucideIcons.settings, size: 20),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ],
           ),
 
           // 筛选器
@@ -276,7 +318,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           if (isLoading)
             // 骨架屏幕
             SliverPadding(
-              padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding - 8, top: 16, bottom: 16),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
@@ -301,7 +343,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
             )
           else
             SliverPadding(
-              padding: EdgeInsets.only(left: horizontalPadding, right: horizontalPadding - 8, top: 16, bottom: 16),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,

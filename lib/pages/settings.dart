@@ -2,11 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../services/config_service.dart';
 import '../services/subscription_service.dart';
 import '../providers/settings_provider.dart';
-import '../models/site.dart';
-import '../models/live.dart';
 import '../widgets/zen_ui.dart';
 import 'source_manage.dart';
 import 'category_manage.dart';
@@ -22,7 +21,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _doubanProxy = 'tencent-cmlius';
   String _doubanImageProxy = 'cmliussss-cdn-tencent';
-  String _siteName = 'EchoTV';
 
   @override
   void initState() {
@@ -34,35 +32,378 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final service = ref.read(configServiceProvider);
     final doubanProxy = await service.getDoubanProxyType();
     final doubanImageProxy = await service.getDoubanImageProxyType();
-    final siteName = await service.getSiteName();
 
     if (mounted) {
       setState(() {
         _doubanProxy = doubanProxy;
         _doubanImageProxy = doubanImageProxy;
-        _siteName = siteName;
       });
     }
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: CustomScrollView(
+        slivers: [
+          // 1. 统一风格的头部
+          SliverAppBar(
+            backgroundColor: Colors.transparent,
+            expandedHeight: isPC ? 90 : 80,
+            floating: true,
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(
+                left: horizontalPadding,
+                right: horizontalPadding,
+                bottom: 12,
+              ),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '设置',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: isPC ? 20 : 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '偏好设置与系统同步',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 2. 设置主体内容
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildSectionTitle('外观与偏好'),
+                _buildSettingGroup([
+                  _buildSelectionItem(
+                    icon: LucideIcons.palette,
+                    title: '主题模式',
+                    value: _getThemeModeLabel(ref.watch(themeModelProvider)),
+                    onTap: () => _showThemePicker(),
+                  ),
+                  _buildSelectionItem(
+                    icon: LucideIcons.globe,
+                    title: '豆瓣 API 代理',
+                    value: _getProxyLabel(_doubanProxy),
+                    onTap: () => _showProxyPicker(),
+                  ),
+                  _buildSelectionItem(
+                    icon: LucideIcons.image,
+                    title: '豆瓣图片代理',
+                    value: _getImageProxyLabel(_doubanImageProxy),
+                    showDivider: false,
+                    onTap: () => _showImageProxyPicker(),
+                  ),
+                ]),
+
+                _buildSectionTitle('数据源管理'),
+                _buildSettingGroup([
+                  _buildNavigationItem(
+                    icon: LucideIcons.database,
+                    title: '视频 CMS 站点',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SourceManagePage())),
+                  ),
+                  _buildNavigationItem(
+                    icon: LucideIcons.layers,
+                    title: '自定义分类映射',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryManagePage())),
+                  ),
+                  _buildNavigationItem(
+                    icon: LucideIcons.tv,
+                    title: '直播 M3U 订阅',
+                    showDivider: false,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LiveManagePage())),
+                  ),
+                ]),
+
+                _buildSectionTitle('配置同步'),
+                _buildSettingGroup([
+                  _buildActionItem(
+                    icon: LucideIcons.refreshCw,
+                    title: '同步远程配置',
+                    onTap: _showRemoteSync,
+                  ),
+                  _buildActionItem(
+                    icon: LucideIcons.fileJson,
+                    title: '从 JSON 导入',
+                    onTap: _showJsonImport,
+                  ),
+                  _buildActionItem(
+                    icon: LucideIcons.share,
+                    title: '导出完整配置',
+                    showDivider: false,
+                    onTap: _exportConfig,
+                  ),
+                ]),
+
+                _buildSectionTitle('高级设置'),
+                _buildSettingGroup([
+                  _buildInfoItem(
+                    icon: LucideIcons.trash2,
+                    title: '清除缓存',
+                    trailing: '12.5 MB',
+                  ),
+                  _buildInfoItem(
+                    icon: LucideIcons.info,
+                    title: '关于 EchoTV',
+                    trailing: 'v1.0.0',
+                    showDivider: false,
+                  ),
+                ]),
+
+                const SizedBox(height: 120),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- 组件构建方法 ---
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 32, 0, 12),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingGroup(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildBaseItem({
+    required IconData icon,
+    required String title,
+    Widget? trailing,
+    VoidCallback? onTap,
+    bool showDivider = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  if (trailing != null) trailing,
+                ],
+              ),
+            ),
+            if (showDivider)
+              Divider(
+                height: 1,
+                indent: 52,
+                endIndent: 0,
+                color: Theme.of(context).dividerColor,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionItem({required IconData icon, required String title, required String value, required VoidCallback onTap, bool showDivider = true}) {
+    return _buildBaseItem(
+      icon: icon,
+      title: title,
+      onTap: onTap,
+      showDivider: showDivider,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 13)),
+          const SizedBox(width: 4),
+          Icon(LucideIcons.chevronRight, size: 14, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationItem({required IconData icon, required String title, required VoidCallback onTap, bool showDivider = true}) {
+    return _buildBaseItem(
+      icon: icon,
+      title: title,
+      onTap: onTap,
+      showDivider: showDivider,
+      trailing: Icon(LucideIcons.chevronRight, size: 16, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
+    );
+  }
+
+  Widget _buildActionItem({required IconData icon, required String title, required VoidCallback onTap, bool showDivider = true}) {
+    return _buildBaseItem(icon: icon, title: title, onTap: onTap, showDivider: showDivider);
+  }
+
+  Widget _buildInfoItem({required IconData icon, required String title, required String trailing, bool showDivider = true}) {
+    return _buildBaseItem(
+      icon: icon,
+      title: title,
+      showDivider: showDivider,
+      trailing: Text(trailing, style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 13)),
+    );
+  }
+
+  // --- 数据转换与弹窗 ---
+
+  String _getThemeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.system: return '跟随系统';
+      case ThemeMode.light: return '浅色';
+      case ThemeMode.dark: return '深色';
+    }
+  }
+
+  String _getProxyLabel(String val) {
+    if (val == 'tencent-cmlius') return '腾讯云镜像';
+    if (val == 'aliyun-cmlius') return '阿里云镜像';
+    return '直连';
+  }
+
+  String _getImageProxyLabel(String val) {
+    if (val == 'cmliussss-cdn-tencent') return '腾讯云 CDN';
+    if (val == 'cmliussss-cdn-ali') return '阿里云 CDN';
+    if (val == 'img3') return '豆瓣官方';
+    return '直连';
+  }
+
+  void _showThemePicker() {
+    _showSimplePicker('选择主题模式', {
+      ThemeMode.system: '跟随系统',
+      ThemeMode.light: '浅色',
+      ThemeMode.dark: '深色',
+    }, ref.read(themeModelProvider), (mode) {
+      ref.read(themeModelProvider.notifier).setThemeMode(mode as ThemeMode);
+    });
+  }
+
+  void _showProxyPicker() {
+    _showSimplePicker('选择 API 代理', {
+      'tencent-cmlius': '腾讯云镜像',
+      'aliyun-cmlius': '阿里云镜像',
+      'none': '直连',
+    }, _doubanProxy, (val) async {
+      await ref.read(configServiceProvider).setDoubanProxyType(val as String);
+      _loadSettings();
+    });
+  }
+
+  void _showImageProxyPicker() {
+    _showSimplePicker('选择图片代理', {
+      'cmliussss-cdn-tencent': '腾讯云 CDN',
+      'cmliussss-cdn-ali': '阿里云 CDN',
+      'img3': '豆瓣官方',
+      'direct': '直连',
+    }, _doubanImageProxy, (val) async {
+      await ref.read(configServiceProvider).setDoubanImageProxyType(val as String);
+      _loadSettings();
+    });
+  }
+
+  void _showSimplePicker(String title, Map<dynamic, String> options, dynamic currentVal, Function(dynamic) onSelect) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ...options.entries.map((e) => ListTile(
+              title: Text(e.value, textAlign: TextAlign.center, style: TextStyle(
+                fontWeight: e.key == currentVal ? FontWeight.bold : FontWeight.normal,
+                color: e.key == currentVal ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
+              )),
+              onTap: () {
+                onSelect(e.key);
+                Navigator.pop(context);
+              },
+            )),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 逻辑操作 (保持原有) ---
 
   void _showJsonImport() {
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        title: const Text('导入 JSON 配置'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text('导入 JSON 配置', style: TextStyle(fontWeight: FontWeight.bold)),
         content: TextField(
           controller: controller,
-          maxLines: 10,
+          maxLines: 8,
           style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-          decoration: const InputDecoration(
-            hintText: '粘贴符合 LunaTV 格式的 JSON...',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: '粘贴符合格式的 JSON...',
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
           TextButton(
             onPressed: () async {
               try {
@@ -71,10 +412,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _loadSettings();
                 if (mounted) Navigator.pop(context);
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
               }
             },
-            child: const Text('导入'),
+            child: Text('导入', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -86,14 +427,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
-        title: const Text('同步远程订阅'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: const Text('同步远程订阅', style: TextStyle(fontWeight: FontWeight.bold)),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: '输入订阅 URL (JSON)'),
+          decoration: InputDecoration(
+            hintText: '输入订阅 URL (JSON)',
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
           TextButton(
             onPressed: () async {
               try {
@@ -101,10 +449,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _loadSettings();
                 if (mounted) Navigator.pop(context);
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
               }
             },
-            child: const Text('同步'),
+            child: Text('同步', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -115,224 +463,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final config = await ref.read(configServiceProvider).exportAll();
     await Clipboard.setData(ClipboardData(text: config));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('配置已复制到剪贴板')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('配置已复制到剪贴板'), behavior: SnackBarBehavior.floating));
     }
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12, top: 24),
-      child: Text(
-        title.toUpperCase(),
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
-    );
-  }
-
-  Widget _buildSettingCard({required List<Widget> children}) {
-    return ZenGlassContainer(
-      borderRadius: 24,
-      blur: 20,
-      child: Column(
-        children: children,
-      ),
-    );
-  }
-
-  Widget _buildSettingItem({
-    required IconData icon,
-    required String title,
-    Widget? trailing,
-    VoidCallback? onTap,
-    bool showDivider = true,
-  }) {
-    return Column(
-      children: [
-        ListTile(
-          leading: Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary.withOpacity(0.7)),
-          title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          trailing: trailing ?? const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-          onTap: onTap,
-        ),
-        if (showDivider)
-          Divider(
-            height: 1,
-            indent: 56,
-            endIndent: 16,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-          ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            expandedHeight: 140,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              titlePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              title: Text(
-                '设置',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 28),
-              ),
-            ),
-          ),
-          
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildSectionTitle('外观与偏好'),
-                _buildSettingCard(children: [
-                  _buildSettingItem(
-                    icon: Icons.palette_outlined,
-                    title: '主题模式',
-                    trailing: DropdownButton<ThemeMode>(
-                      value: ref.watch(themeModelProvider),
-                      underline: const SizedBox(),
-                      dropdownColor: Theme.of(context).cardColor,
-                      iconEnabledColor: Theme.of(context).colorScheme.primary,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      onChanged: (mode) async {
-                        if (mode != null) {
-                          await ref.read(themeModelProvider.notifier).setThemeMode(mode);
-                        }
-                      },
-                      items: const [
-                        DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
-                        DropdownMenuItem(value: ThemeMode.light, child: Text('明亮')),
-                        DropdownMenuItem(value: ThemeMode.dark, child: Text('深邃')),
-                      ],
-                    ),
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.language_outlined,
-                    title: '豆瓣 API 代理',
-                    trailing: DropdownButton<String>(
-                      value: _doubanProxy,
-                      underline: const SizedBox(),
-                      dropdownColor: Theme.of(context).cardColor,
-                      iconEnabledColor: Theme.of(context).colorScheme.primary,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      onChanged: (type) async {
-                        if (type != null) {
-                          await ref.read(configServiceProvider).setDoubanProxyType(type);
-                          _loadSettings();
-                        }
-                      },
-                      items: const [
-                        DropdownMenuItem(value: 'tencent-cmlius', child: Text('腾讯云镜像')),
-                        DropdownMenuItem(value: 'aliyun-cmlius', child: Text('阿里云镜像')),
-                        DropdownMenuItem(value: 'none', child: Text('直连')),
-                      ],
-                    ),
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.image_outlined,
-                    title: '豆瓣图片代理',
-                    showDivider: false,
-                    trailing: DropdownButton<String>(
-                      value: _doubanImageProxy,
-                      underline: const SizedBox(),
-                      dropdownColor: Theme.of(context).cardColor,
-                      iconEnabledColor: Theme.of(context).colorScheme.primary,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      onChanged: (type) async {
-                        if (type != null) {
-                          await ref.read(configServiceProvider).setDoubanImageProxyType(type);
-                          _loadSettings();
-                        }
-                      },
-                      items: const [
-                        DropdownMenuItem(value: 'cmliussss-cdn-tencent', child: Text('腾讯云 CDN')),
-                        DropdownMenuItem(value: 'cmliussss-cdn-ali', child: Text('阿里云 CDN')),
-                        DropdownMenuItem(value: 'img3', child: Text('豆瓣官方 CDN')),
-                        DropdownMenuItem(value: 'direct', child: Text('直连')),
-                      ],
-                    ),
-                  ),
-                ]),
-
-                _buildSectionTitle('数据源管理'),
-                _buildSettingCard(children: [
-                  _buildSettingItem(
-                    icon: Icons.movie_filter_outlined,
-                    title: '视频 CMS 站点',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SourceManagePage())),
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.category_outlined,
-                    title: '自定义分类映射',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryManagePage())),
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.live_tv_outlined,
-                    title: '直播 M3U 订阅',
-                    showDivider: false,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LiveManagePage())),
-                  ),
-                ]),
-
-                _buildSectionTitle('配置同步'),
-                _buildSettingCard(children: [
-                  _buildSettingItem(
-                    icon: Icons.cloud_download_outlined,
-                    title: '同步远程配置',
-                    onTap: _showRemoteSync,
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.code_rounded,
-                    title: '从 JSON 导入',
-                    onTap: _showJsonImport,
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.ios_share_outlined,
-                    title: '导出完整配置',
-                    showDivider: false,
-                    onTap: _exportConfig,
-                  ),
-                ]),
-
-                _buildSectionTitle('高级设置'),
-                _buildSettingCard(children: [
-                  _buildSettingItem(
-                    icon: Icons.cleaning_services_outlined,
-                    title: '清除缓存',
-                    trailing: const Text('12.5 MB', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                    onTap: () {},
-                  ),
-                  _buildSettingItem(
-                    icon: Icons.info_outline,
-                    title: '关于 EchoTV',
-                    showDivider: false,
-                    trailing: const Text('v1.0.0', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                  ),
-                ]),
-                
-                const SizedBox(height: 120),
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

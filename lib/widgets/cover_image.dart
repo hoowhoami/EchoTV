@@ -4,9 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/config_service.dart';
 
 /// 通用封面图片组件
-/// - 如果是豆瓣地址，自动处理代理
-/// - 否则直接显示
-class CoverImage extends ConsumerWidget {
+/// - 采用静态处理逻辑，避免 FutureBuilder 频繁触发
+/// - 内部自动处理豆瓣代理逻辑
+class CoverImage extends ConsumerStatefulWidget {
   final String imageUrl;
   final BoxFit fit;
   final Widget? placeholder;
@@ -19,65 +19,88 @@ class CoverImage extends ConsumerWidget {
     this.fit = BoxFit.cover,
     this.placeholder,
     this.errorWidget,
-    this.aspectRatio = 2 / 3, // 默认 2:3 海报比例
+    this.aspectRatio = 2 / 3,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 检查是否为豆瓣地址
-    final isDoubanUrl = _isDoubanUrl(imageUrl);
+  ConsumerState<CoverImage> createState() => _CoverImageState();
+}
 
-    if (isDoubanUrl) {
-      // 豆瓣地址：使用代理
-      return FutureBuilder<String>(
-        future: ref.read(configServiceProvider).processImageUrl(imageUrl),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            // 显示占位符直到 URL 处理完成
-            return AspectRatio(
-              aspectRatio: aspectRatio,
-              child: placeholder != null
-                  ? placeholder!
-                  : Container(color: Colors.grey[200]),
-            );
-          }
+class _CoverImageState extends ConsumerState<CoverImage> {
+  String? _processedUrl;
+  bool _isLoading = false;
 
-          final processedUrl = snapshot.data ?? imageUrl;
-          return AspectRatio(
-            aspectRatio: aspectRatio,
-            child: _buildImage(processedUrl),
-          );
-        },
-      );
-    } else {
-      // 非豆瓣地址：直接显示
-      return AspectRatio(
-        aspectRatio: aspectRatio,
-        child: _buildImage(imageUrl),
-      );
+  @override
+  void initState() {
+    super.initState();
+    _processUrl();
+  }
+
+  @override
+  void didUpdateWidget(CoverImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _processUrl();
     }
   }
 
-  Widget _buildImage(String url) {
-    return CachedNetworkImage(
-      imageUrl: url,
-      fit: fit,
-      placeholder: placeholder != null
-          ? (context, url) => placeholder!
-          : (context, url) => Container(color: Colors.grey[200]),
-      errorWidget: errorWidget != null
-          ? (context, url, error) => errorWidget!
-          : (context, url, error) => Container(
-                color: Colors.grey[200],
-                child: const Center(
-                  child: Icon(Icons.error, color: Colors.grey),
-                ),
-              ),
-    );
+  void _processUrl() async {
+    final isDoubanUrl = widget.imageUrl.isNotEmpty && widget.imageUrl.contains('doubanio.com');
+    
+    if (!isDoubanUrl) {
+      if (mounted) {
+        setState(() {
+          _processedUrl = widget.imageUrl;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _isLoading = true);
+    
+    // 从 Provider 读取服务进行处理
+    final processed = await ref.read(configServiceProvider).processImageUrl(widget.imageUrl);
+    
+    if (mounted) {
+      setState(() {
+        _processedUrl = processed;
+        _isLoading = false;
+      });
+    }
   }
 
-  /// 判断是否为豆瓣图片地址
-  bool _isDoubanUrl(String url) {
-    return url.isNotEmpty && url.contains('doubanio.com');
+  @override
+  Widget build(BuildContext context) {
+    // 渲染占位符
+    final loadingPlaceholder = AspectRatio(
+      aspectRatio: widget.aspectRatio,
+      child: widget.placeholder ?? Container(
+        color: Theme.of(context).brightness == Brightness.dark 
+            ? Colors.white.withValues(alpha: 0.05) 
+            : Colors.black.withValues(alpha: 0.05),
+      ),
+    );
+
+    if (_processedUrl == null && _isLoading) {
+      return loadingPlaceholder;
+    }
+
+    final finalUrl = _processedUrl ?? widget.imageUrl;
+
+    return AspectRatio(
+      aspectRatio: widget.aspectRatio,
+      child: CachedNetworkImage(
+        imageUrl: finalUrl,
+        fit: widget.fit,
+        // 使用 memCache 优化性能
+        memCacheHeight: 600, 
+        placeholder: (context, url) => loadingPlaceholder,
+        errorWidget: (context, url, error) => widget.errorWidget ?? Container(
+          color: Colors.black12,
+          child: const Center(child: Icon(Icons.broken_image_outlined, size: 24, color: Colors.grey)),
+        ),
+      ),
+    );
   }
 }

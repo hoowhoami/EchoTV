@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../models/movie.dart';
 import '../models/site.dart';
 import '../services/cms_service.dart';
@@ -35,15 +37,11 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   ChewieController? _chewieController;
   bool _isPlaying = false;
 
-  // 质量信息缓存
   final Map<String, VideoQualityInfo> _qualityInfoMap = {};
   final Map<String, double> _scoreMap = {};
   final Set<String> _testedSources = {};
 
-  // 排序相关
   bool _descending = false;
-
-  // PC端选集面板折叠状态（仅在 lg 及以上屏幕有效）
   bool _isEpisodeSelectorCollapsed = false;
 
   @override
@@ -63,23 +61,17 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     });
 
     final sites = await configService.getSites();
-
-    // 使用流式搜索：只要有结果就立即展示
     bool hasSetFirstSource = false;
 
     await for (final results in cmsService.searchAllStream(sites, widget.subject.title)) {
       if (!mounted) break;
 
-      // 宽松过滤逻辑：只要标题包含关键词即可
       final matchedResults = results.where((res) {
         final sTitle = res.title.replaceAll(' ', '').toLowerCase();
         final tTitle = widget.subject.title.replaceAll(' ', '').toLowerCase();
-
-        // 双向匹配：源标题包含搜索词 或 搜索词包含源标题
         return sTitle.contains(tTitle) || tTitle.contains(sTitle);
       }).toList();
 
-      // 去重：基于 source-id 组合
       final seenKeys = <String>{};
       final filtered = <VideoDetail>[];
       for (var res in matchedResults) {
@@ -90,7 +82,6 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         }
       }
 
-      // 基础排序：完全匹配优先，集数多优先
       filtered.sort((a, b) {
         final aExact = a.title.replaceAll(' ', '').toLowerCase() == widget.subject.title.replaceAll(' ', '').toLowerCase();
         final bExact = b.title.replaceAll(' ', '').toLowerCase() == widget.subject.title.replaceAll(' ', '').toLowerCase();
@@ -101,8 +92,6 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
       setState(() {
         _availableSources = filtered;
-
-        // 只要有第一个结果就立即展示并结束搜索状态
         if (!hasSetFirstSource && filtered.isNotEmpty) {
           _currentSource = filtered.first;
           _isSearching = false;
@@ -110,47 +99,31 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         }
       });
 
-      // 当有多个源时，触发优选（只在第一次有多个源时触发）
       if (hasSetFirstSource && filtered.length > 1 && !_isOptimizing) {
         _optimizeBestSource(filtered);
       }
     }
 
-    // 流结束后确保搜索状态关闭
-    if (mounted) {
-      setState(() {
-        _isSearching = false;
-      });
-    }
+    if (mounted) setState(() => _isSearching = false);
   }
 
-  /// 自动优选最佳播放源
   Future<void> _optimizeBestSource(List<VideoDetail> sources) async {
     if (sources.isEmpty) return;
-
     setState(() => _isOptimizing = true);
-
     try {
       final optimizer = ref.read(sourceOptimizerServiceProvider);
       final result = await optimizer.selectBestSource(sources);
-
       if (mounted) {
         setState(() {
           _qualityInfoMap.addAll(result.qualityInfoMap);
           _scoreMap.addAll(result.scoreMap);
           _testedSources.addAll(result.qualityInfoMap.keys);
           _isOptimizing = false;
-
-          // 如果当前未播放，自动切换到最佳源
-          if (!_isPlaying) {
-            _currentSource = result.bestSource;
-          }
+          if (!_isPlaying) _currentSource = result.bestSource;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isOptimizing = false);
-      }
+      if (mounted) setState(() => _isOptimizing = false);
     }
   }
 
@@ -167,56 +140,35 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     try {
       _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
       await _videoController!.initialize();
-
-      // 恢复播放进度（如果指定）
       if (resumePosition != null && resumePosition > 1) {
         await _videoController!.seekTo(Duration(seconds: resumePosition.toInt()));
       }
-
       _chewieController = ChewieController(
         videoPlayerController: _videoController!,
         autoPlay: true,
         aspectRatio: _videoController!.value.aspectRatio,
         allowFullScreen: true,
-        materialProgressColors: ChewieProgressColors(playedColor: Colors.white, handleColor: Colors.white),
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Theme.of(context).primaryColor,
+          handleColor: Theme.of(context).primaryColor,
+        ),
       );
-    } catch (e) {
-      // Player initialization failed
-    }
+    } catch (e) {}
     if (mounted) setState(() {});
   }
 
-  /// 智能换源：尝试保持相同集数和播放进度
   Future<void> _switchSource(VideoDetail newSource) async {
     final oldEpisodeIndex = _currentEpisodeIndex;
     final oldPlayPosition = _videoController?.value.position.inSeconds.toDouble() ?? 0.0;
-
-    setState(() {
-      _currentSource = newSource;
-    });
-
-    // 尝试保持相同集数
+    setState(() => _currentSource = newSource);
     final newGroup = newSource.playGroups.first;
-    int targetIndex = oldEpisodeIndex;
-
-    // 如果新源的集数不够，跳到第一集
-    if (targetIndex >= newGroup.urls.length) {
-      targetIndex = 0;
-    }
-
-    // 如果正在播放，自动切换到新源的对应集数
+    int targetIndex = oldEpisodeIndex >= newGroup.urls.length ? 0 : oldEpisodeIndex;
     if (_isPlaying) {
-      // 同集数时尝试恢复播放进度
       final resumePosition = (targetIndex == oldEpisodeIndex && oldPlayPosition > 1) ? oldPlayPosition : null;
       await _initializePlayer(newGroup.urls[targetIndex], targetIndex, resumePosition: resumePosition);
     } else {
-      // 未播放时只更新集数索引
-      setState(() {
-        _currentEpisodeIndex = targetIndex;
-      });
+      setState(() => _currentEpisodeIndex = targetIndex);
     }
-
-    // 自动切换回选集 Tab
     _tabController.animateTo(0);
   }
 
@@ -233,842 +185,412 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isPC = screenWidth > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: _buildMainLayout(theme, isPC, screenWidth),
-    );
-  }
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          // 背景氛围：高斯模糊海报
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.1,
+              child: CoverImage(imageUrl: widget.subject.cover),
+            ),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+              child: Container(color: Colors.transparent),
+            ),
+          ),
 
-  Widget _buildMainLayout(ThemeData theme, bool isPC, double screenWidth) {
-    return CustomScrollView(
-      slivers: [
-        // 透明 AppBar（返回按钮）
-        SliverAppBar(
-          backgroundColor: Colors.transparent,
-          floating: true,
-          leading: Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => Navigator.pop(context),
-                  borderRadius: BorderRadius.circular(20),
-                  child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
+          CustomScrollView(
+            slivers: [
+              // 沉浸式返回头
+              SliverAppBar(
+                backgroundColor: Colors.transparent,
+                leading: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: ClipOval(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
+                        child: IconButton(
+                          icon: const Icon(LucideIcons.chevronLeft, size: 20),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPlayerAndEpisodeSection(theme, isPC, screenWidth),
+                      const SizedBox(height: 48),
+                      _buildDetailSection(theme, isPC),
+                      const SizedBox(height: 120),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-
-        // 内容区域
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isPC ? 48 : 16,
-              vertical: 8,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 播放器和选集区域
-                _buildPlayerAndEpisodeSection(theme, isPC, screenWidth),
-                const SizedBox(height: 24),
-
-                // 详情区域
-                _buildDetailSection(theme, isPC),
-
-                // 底部留白
-                const SizedBox(height: 120),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  /// 播放器和选集区域（参考 LunaTV 的 Grid 布局）
   Widget _buildPlayerAndEpisodeSection(ThemeData theme, bool isPC, double screenWidth) {
     if (!isPC) {
-      // 移动端：垂直布局
       return Column(
         children: [
-          _buildVideoPlayer(theme, isPC),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 360,
-            child: _buildEpisodePanel(theme),
-          ),
+          _buildVideoPlayer(theme, false),
+          const SizedBox(height: 24),
+          _buildEpisodePanel(theme, 360),
         ],
       );
     }
 
-    // PC端：使用 Row 模拟 Grid 效果（3:1 比例）
     return Column(
       children: [
-        // 折叠控制按钮（仅PC端显示）
-        Align(
-          alignment: Alignment.centerRight,
-          child: _buildCollapseButton(theme),
-        ),
-        const SizedBox(height: 8),
-
-        // 播放器 + 选集面板
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 播放器区域（占 3/4）
             Expanded(
               flex: 3,
-              child: _buildVideoPlayer(theme, isPC),
+              child: _buildVideoPlayer(theme, true),
             ),
-            const SizedBox(width: 16),
-
-            // 选集面板（占 1/4）
-            if (!_isEpisodeSelectorCollapsed)
-              Expanded(
-                flex: 1,
-                child: SizedBox(
-                  height: _calculatePlayerHeight(screenWidth),
-                  child: _buildEpisodePanel(theme),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// 折叠按钮（仅PC端）- 简化风格
-  Widget _buildCollapseButton(ThemeData theme) {
-    return GestureDetector(
-      onTap: () => setState(() => _isEpisodeSelectorCollapsed = !_isEpisodeSelectorCollapsed),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _isEpisodeSelectorCollapsed ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-              size: 12,
-              color: theme.colorScheme.secondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _isEpisodeSelectorCollapsed ? '显示' : '隐藏',
-              style: TextStyle(
-                color: theme.colorScheme.secondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 计算播放器高度（参考 LunaTV）
-  double _calculatePlayerHeight(double screenWidth) {
-    if (screenWidth < 1200) return 400;
-    if (screenWidth < 1600) return 520;
-    return 600;
-  }
-
-  /// 选集面板（包含 Tab）- 简洁风格
-  Widget _buildEpisodePanel(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        children: [
-          _buildTabBar(theme),
-          Expanded(child: _buildTabView(theme)),
-        ],
-      ),
-    );
-  }
-
-  /// 详情区域（参考 LunaTV：封面在左侧）
-  Widget _buildDetailSection(ThemeData theme, bool isPC) {
-    if (isPC) {
-      // PC端：左右布局，封面在左侧
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 封面（在左侧）
-          SizedBox(
-            width: 180,
-            child: _buildPoster(theme),
-          ),
-          const SizedBox(width: 24),
-
-          // 文字信息（占剩余空间）
-          Expanded(
-            child: _buildVideoInfo(theme),
-          ),
-        ],
-      );
-    }
-
-    // 移动端：只显示文字信息
-    return _buildVideoInfo(theme);
-  }
-
-  /// 封面 - iOS 风格
-  Widget _buildPoster(ThemeData theme) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: AspectRatio(
-        aspectRatio: 2 / 3,
-        child: CoverImage(
-          imageUrl: widget.subject.cover,
-          errorWidget: Container(
-            color: theme.colorScheme.surfaceContainerHighest,
-            child: Icon(
-              Icons.movie,
-              size: 48,
-              color: theme.colorScheme.secondary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 视频信息文字 - 简洁风格
-  Widget _buildVideoInfo(ThemeData theme) {
-    final group = _currentSource?.playGroups.first;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 标题和收藏按钮
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                widget.subject.title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IconButton(
-              onPressed: () {
-                // TODO: 收藏功能
-              },
-              icon: Icon(
-                Icons.favorite_border,
-                color: theme.colorScheme.secondary,
-              ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: _isEpisodeSelectorCollapsed ? 0 : 320,
+              margin: EdgeInsets.only(left: _isEpisodeSelectorCollapsed ? 0 : 24),
+              child: _isEpisodeSelectorCollapsed 
+                  ? const SizedBox() 
+                  : _buildEpisodePanel(theme, _calculatePlayerHeight(screenWidth)),
             ),
           ],
         ),
         const SizedBox(height: 12),
-
-        // 关键信息行
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            if (widget.subject.year != null)
-              Text(
-                widget.subject.year!,
-                style: TextStyle(
-                  color: theme.colorScheme.secondary,
-                  fontSize: 13,
-                ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: GestureDetector(
+            onTap: () => setState(() => _isEpisodeSelectorCollapsed = !_isEpisodeSelectorCollapsed),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: theme.dividerColor),
               ),
-            if (group != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _currentSource?.sourceName ?? '',
-                  style: TextStyle(
-                    color: theme.primaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            if (group != null)
-              Text(
-                '${group.urls.length} 集',
-                style: TextStyle(
-                  color: theme.colorScheme.secondary,
-                  fontSize: 13,
-                ),
-              ),
-            if (widget.subject.rate.isNotEmpty)
-              Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('⭐ ', style: TextStyle(fontSize: 12)),
-                  Text(
-                    widget.subject.rate,
-                    style: TextStyle(
-                      color: theme.colorScheme.secondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Icon(_isEpisodeSelectorCollapsed ? LucideIcons.maximize2 : LucideIcons.minimize2, size: 14, color: theme.colorScheme.secondary),
+                  const SizedBox(width: 8),
+                  Text(_isEpisodeSelectorCollapsed ? '展开选集' : '收起选集', style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary)),
                 ],
               ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // 剧情简介
-        if (_fullSubject?.description != null)
-          Text(
-            _fullSubject!.description!,
-            style: TextStyle(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              fontSize: 13,
-              height: 1.6,
             ),
           ),
+        ),
       ],
     );
   }
 
-  Widget _buildVideoPlayer(ThemeData theme, [bool isPC = false]) {
-    // PC端使用固定高度，移动端使用 16:9 比例
-    if (isPC) {
-      final screenWidth = MediaQuery.of(context).size.width;
-      final playerHeight = _calculatePlayerHeight(screenWidth);
-
-      return SizedBox(
-        height: playerHeight,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              if (_isPlaying)
-                Center(
-                  child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
-                      ? Chewie(controller: _chewieController!)
-                      : const CircularProgressIndicator(color: Colors.white),
-                )
-              else
-                Positioned.fill(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
-                      Container(color: Colors.black.withValues(alpha: 0.5)),
-                      Center(
-                        child: _isSearching
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : _currentSource != null
-                            ? GestureDetector(
-                                onTap: () => _initializePlayer(_currentSource!.playGroups.first.urls[0], 0),
-                                child: Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.3),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(Icons.play_arrow_rounded, size: 48, color: Colors.black),
-                                ),
-                              )
-                            : Text('未找到资源', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 移动端：16:9 比例
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            if (_isPlaying)
-              Center(
-                child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
-                    ? Chewie(controller: _chewieController!)
-                    : const CircularProgressIndicator(color: Colors.white),
-              )
-            else
-              Positioned.fill(
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
-                    Container(color: Colors.black.withValues(alpha: 0.5)),
-                    Center(
-                      child: _isSearching
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : _currentSource != null
-                          ? GestureDetector(
-                              onTap: () => _initializePlayer(_currentSource!.playGroups.first.urls[0], 0),
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.3),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(Icons.play_arrow_rounded, size: 40, color: Colors.black),
-                              ),
-                            )
-                          : Text('未找到资源', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+  double _calculatePlayerHeight(double screenWidth) {
+    if (screenWidth < 1200) return 400;
+    if (screenWidth < 1600) return 520;
+    return 640;
   }
 
-  Widget _buildTabBar(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.1),
-            width: 1,
+  Widget _buildVideoPlayer(ThemeData theme, bool isPC) {
+    final content = Stack(
+      children: [
+        if (_isPlaying)
+          Center(
+            child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+                ? Chewie(controller: _chewieController!)
+                : const CircularProgressIndicator(),
+          )
+        else
+          Positioned.fill(
+            child: Stack(
+              children: [
+                Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
+                Container(color: Colors.black.withValues(alpha: 0.6)),
+                Center(
+                  child: _isSearching
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : _currentSource != null
+                      ? ZenButton(
+                          onPressed: () => _initializePlayer(_currentSource!.playGroups.first.urls[0], 0),
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.play, size: 18),
+                              SizedBox(width: 8),
+                              Text('立即播放'),
+                            ],
+                          ),
+                        )
+                      : const Text('未找到资源', style: TextStyle(color: Colors.white70)),
+                ),
+              ],
+            ),
           ),
-        ),
+      ],
+    );
+
+    final playerContainer = Container(
+      height: isPC ? _calculatePlayerHeight(MediaQuery.of(context).size.width) : null,
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 40, offset: const Offset(0, 20)),
+        ],
       ),
-      child: TabBar(
-        controller: _tabController,
-        indicatorColor: theme.primaryColor,
-        labelColor: theme.primaryColor,
-        unselectedLabelColor: theme.colorScheme.secondary,
-        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontSize: 14),
-        indicatorWeight: 2,
-        overlayColor: WidgetStateProperty.all(Colors.transparent),
-        splashFactory: NoSplash.splashFactory,
-        tabs: const [
-          Tab(text: '选集'),
-          Tab(text: '换源'),
+      clipBehavior: Clip.antiAlias,
+      child: content,
+    );
+
+    if (!isPC) {
+      return AspectRatio(aspectRatio: 16 / 9, child: playerContainer);
+    }
+    return playerContainer;
+  }
+
+  Widget _buildEpisodePanel(ThemeData theme, double height) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            indicatorSize: TabBarIndicatorSize.label,
+            indicatorColor: theme.colorScheme.primary,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+            tabs: const [Tab(text: '选集'), Tab(text: '源站')],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildEpisodeTab(theme),
+                _buildSourceTab(theme),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTabView(ThemeData theme) {
-    return TabBarView(
-      controller: _tabController,
+  Widget _buildDetailSection(ThemeData theme, bool isPC) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildEpisodeTab(theme),
-        _buildSourceTab(theme),
+        if (isPC) ...[
+          SizedBox(
+            width: 200,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(aspectRatio: 2/3, child: CoverImage(imageUrl: widget.subject.cover)),
+            ),
+          ),
+          const SizedBox(width: 48),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.subject.title,
+                      style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w900, fontSize: isPC ? 32 : 24),
+                    ),
+                  ),
+                  if (widget.subject.rate.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                      child: Text('⭐ ${widget.subject.rate}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                children: [
+                  if (widget.subject.year != null) _buildInfoBadge(widget.subject.year!, theme),
+                  if (_currentSource != null) _buildInfoBadge(_currentSource!.sourceName, theme, isAccent: true),
+                  _buildInfoBadge('${_currentSource?.playGroups.first.urls.length ?? 0} 集', theme),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _fullSubject?.description ?? '正在加载详情...',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  height: 1.8,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildInfoBadge(String text, ThemeData theme, {bool isAccent = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isAccent ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: isAccent ? theme.colorScheme.primary : theme.colorScheme.secondary,
+        ),
+      ),
     );
   }
 
   Widget _buildEpisodeTab(ThemeData theme) {
     if (_isSearching) return const Center(child: CircularProgressIndicator());
     if (_currentSource == null) return const Center(child: Text('暂无资源'));
-
     final group = _currentSource!.playGroups.first;
-    final totalEpisodes = group.urls.length;
-
-    // 响应式布局
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isPC = screenWidth > 800;
-    final crossAxisCount = isPC ? 4 : 3;
-
-    return CustomScrollView(
-      slivers: [
-        // 排序按钮
-        SliverToBoxAdapter(
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isPC ? 12 : 16,
-              vertical: isPC ? 10 : 4,
+    final isPC = MediaQuery.of(context).size.width > 800;
+    
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isPC ? 4 : 3,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 2.2,
+      ),
+      itemCount: group.urls.length,
+      itemBuilder: (context, i) {
+        final index = _descending ? (group.urls.length - 1 - i) : i;
+        final isCurrent = _currentEpisodeIndex == index && _isPlaying;
+        return GestureDetector(
+          onTap: () => _initializePlayer(group.urls[index], index),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.swap_vert, color: theme.primaryColor, size: isPC ? 26 : 18),
-                  onPressed: () => setState(() => _descending = !_descending),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // 集数网格
-        SliverPadding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isPC ? 12 : 16,
-            vertical: isPC ? 10 : 4,
-          ),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              mainAxisSpacing: isPC ? 10 : 4,
-              crossAxisSpacing: isPC ? 10 : 4,
-              childAspectRatio: isPC ? 1.8 : 2.8,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final index = _descending ? (totalEpisodes - 1 - i) : i;
-                final isCurrent = _currentEpisodeIndex == index && _isPlaying;
-                return GestureDetector(
-                  onTap: () => _initializePlayer(group.urls[index], index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    decoration: BoxDecoration(
-                      color: isCurrent
-                          ? theme.primaryColor
-                          : theme.colorScheme.surface.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(isPC ? 8 : 4),
-                      border: isCurrent
-                          ? Border.all(
-                              color: theme.primaryColor,
-                              width: 2,
-                            )
-                          : Border.all(
-                              color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                              width: 1,
-                            ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      group.titles[index],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isCurrent
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                        fontSize: isPC ? 12 : 11,
-                      ),
-                    ),
-                  ),
-                );
-              },
-              childCount: totalEpisodes,
+            alignment: Alignment.center,
+            child: Text(
+              group.titles[index],
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isCurrent ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) : theme.colorScheme.onSurface,
+              ),
             ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 12)),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildSourceTab(ThemeData theme) {
-    if (_isSearching) return const Center(child: CircularProgressIndicator());
-    if (_availableSources.isEmpty) return const Center(child: Text('未搜到匹配资源'));
-
-    // 按评分排序（如果有评分数据）
-    final sortedSources = List<VideoDetail>.from(_availableSources);
-    if (_scoreMap.isNotEmpty) {
-      sortedSources.sort((a, b) {
-        final aKey = '${a.source}-${a.id}';
-        final bKey = '${b.source}-${b.id}';
-        final aScore = _scoreMap[aKey] ?? 0.0;
-        final bScore = _scoreMap[bKey] ?? 0.0;
-        return bScore.compareTo(aScore);
-      });
-    }
-
-    return Column(
-      children: [
-        // 优选状态提示
-        if (_isOptimizing)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            decoration: BoxDecoration(
-              color: theme.primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text('正在检测播放源质量...', style: TextStyle(color: theme.primaryColor, fontSize: 11)),
-              ],
-            ),
-          ),
-
-        // 播放源列表
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: sortedSources.length,
-            itemBuilder: (context, index) {
-              final res = sortedSources[index];
-              final isSelected = _currentSource == res;
-              final sourceKey = '${res.source}-${res.id}';
-              final qualityInfo = _qualityInfoMap[sourceKey];
-              final score = _scoreMap[sourceKey];
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: GestureDetector(
-                  onTap: () => _switchSource(res),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? theme.primaryColor
-                          : theme.colorScheme.surface.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(10),
-                      border: isSelected
-                          ? Border.all(color: theme.primaryColor, width: 2)
-                          : Border.all(
-                              color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                              width: 1,
-                            ),
-                    ),
-                    child: Row(
+    if (_availableSources.isEmpty) return const Center(child: Text('未搜到资源'));
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: _availableSources.length,
+      itemBuilder: (context, index) {
+        final res = _availableSources[index];
+        final isSelected = _currentSource == res;
+        final quality = _qualityInfoMap['${res.source}-${res.id}'];
+        
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: InkWell(
+            onTap: () => _switchSource(res),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.3) : theme.dividerColor),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 左侧：标题和标签
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 标题行
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 2,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    res.title,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface.withValues(alpha: 0.85),
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  // 分辨率标签
-                                  if (qualityInfo != null && !qualityInfo.hasError)
-                                    _buildQualityBadge(qualityInfo.quality, theme),
-                                  // 选中图标
-                                  if (isSelected)
-                                    Icon(Icons.check_circle, color: theme.colorScheme.onPrimary, size: 14),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-
-                              // 源信息行
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 2,
-                                children: [
-                                  Text(
-                                    res.sourceName,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: isSelected
-                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
-                                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                  Text(
-                                    '${res.playGroups.first.urls.length} 集',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: isSelected
-                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
-                                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                    ),
-                                  ),
-                                  if (score != null)
-                                    Text(
-                                      '⭐ ${score.toStringAsFixed(1)}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: isSelected
-                                            ? theme.colorScheme.onPrimary
-                                            : theme.primaryColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                        Text(res.sourceName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text('${res.playGroups.first.urls.length} 个资源', style: TextStyle(fontSize: 11, color: theme.colorScheme.secondary)),
+                            if (quality != null && !quality.hasError) ...[
+                              const SizedBox(width: 12),
+                              Icon(LucideIcons.gauge, size: 10, color: Colors.green.withValues(alpha: 0.7)),
+                              const SizedBox(width: 4),
+                              Text(quality.loadSpeed, style: const TextStyle(fontSize: 10, color: Colors.green)),
+                              const SizedBox(width: 8),
+                              Icon(LucideIcons.activity, size: 10, color: Colors.orange.withValues(alpha: 0.7)),
+                              const SizedBox(width: 4),
+                              Text('${quality.pingTime}ms', style: const TextStyle(fontSize: 10, color: Colors.orange)),
                             ],
-                          ),
+                          ],
                         ),
-
-                        // 右侧：质量信息（如果有）
-                        if (qualityInfo != null && !qualityInfo.hasError)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.speed,
-                                    size: 10,
-                                    color: isSelected
-                                        ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
-                                        : Colors.green,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    qualityInfo.loadSpeed,
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: isSelected
-                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
-                                          : Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.network_ping,
-                                    size: 10,
-                                    color: isSelected
-                                        ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
-                                        : Colors.orange,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    '${qualityInfo.pingTime}ms',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: isSelected
-                                          ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
-                                          : Colors.orange,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
                       ],
                     ),
                   ),
-                ),
-              );
-            },
+                  if (quality != null && !quality.hasError)
+                    _buildQualityBadge(quality.quality),
+                  if (isSelected) Icon(LucideIcons.checkCircle2, size: 18, color: theme.colorScheme.primary),
+                ],
+              ),
+            ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  /// 构建分辨率标签
-  Widget _buildQualityBadge(String quality, ThemeData theme) {
-    Color color;
-    switch (quality) {
-      case '4K':
-      case '2K':
-        color = Colors.purple;
-        break;
-      case '1080p':
-      case '720p':
-        color = Colors.green;
-        break;
-      case '480p':
-      case 'SD':
-        color = Colors.orange;
-        break;
-      default:
-        color = Colors.grey;
-    }
+  Widget _buildQualityBadge(String quality) {
+    Color color = Colors.green;
+    if (quality.contains('4K')) color = Colors.purple;
+    if (quality.contains('SD')) color = Colors.orange;
 
     return Container(
+      margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        quality,
-        style: TextStyle(
-          fontSize: 10,
-          color: color,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+      child: Text(quality, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 }

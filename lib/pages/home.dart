@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../services/douban_service.dart';
 import '../models/movie.dart';
 import '../widgets/zen_ui.dart';
@@ -92,7 +93,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         SizedBox(
           height: 260, // 增加高度以适应 MovieCard 的内容（图片210px + 间距和文本约40px）
-          child: data.when(
+          child: data.maybeWhen(
+            skipLoadingOnReload: true,
+            skipLoadingOnRefresh: true,
             data: (movies) => Stack(
               children: [
                 ListView.builder(
@@ -207,7 +210,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 );
               },
             ),
-            error: (err, stack) => Center(child: Text('Error: $err')),
+            orElse: () => const SizedBox.shrink(),
           ),
         ),
       ],
@@ -220,6 +223,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final hotTvShows = ref.watch(hotTvShowsProvider);
     final hotVarietyShows = ref.watch(hotVarietyShowsProvider);
 
+    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isPC = screenWidth > 800;
 
@@ -232,11 +236,24 @@ class _HomePageState extends ConsumerState<HomePage> {
             floating: true,
             title: Text(
               'ECHOTV',
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                fontSize: isPC ? 28 : 20,
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.displayMedium?.copyWith(
+                fontSize: isPC ? 24 : 20,
+                fontWeight: FontWeight.w900,
               ),
             ),
+            actions: [
+              if (!isPC) ...[
+                IconButton(
+                  onPressed: () => context.go('/search'),
+                  icon: const Icon(LucideIcons.search, size: 20),
+                ),
+                IconButton(
+                  onPressed: () => context.go('/settings'),
+                  icon: const Icon(LucideIcons.settings, size: 20),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ],
           ),
 
           SliverToBoxAdapter(

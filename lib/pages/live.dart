@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:go_router/go_router.dart';
 import '../services/live_service.dart';
 import '../services/config_service.dart';
 import '../models/live.dart';
@@ -52,32 +54,70 @@ class _LivePageState extends ConsumerState<LivePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             backgroundColor: Colors.transparent,
-            expandedHeight: 120,
+            expandedHeight: isPC ? 90 : 80,
             floating: true,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              title: Text(
-                '电视直播',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 28),
+              centerTitle: false,
+              titlePadding: EdgeInsets.only(
+                left: horizontalPadding, 
+                right: horizontalPadding,
+                bottom: 12,
+              ),
+              title: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '电视直播',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: isPC ? 20 : 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '来自 M3U 订阅的直播源',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
               if (_sources.length > 1)
                 PopupMenuButton<LiveSource>(
-                  icon: const Icon(Icons.playlist_play),
+                  icon: Icon(Icons.playlist_play, color: theme.colorScheme.primary),
                   onSelected: _loadChannels,
                   itemBuilder: (context) => _sources.map((s) => PopupMenuItem(
                     value: s,
                     child: Text(s.name),
                   )).toList(),
                 ),
-              const SizedBox(width: 16),
+              if (!isPC) ...[
+                IconButton(
+                  onPressed: () => context.go('/search'),
+                  icon: const Icon(LucideIcons.search, size: 20),
+                ),
+                IconButton(
+                  onPressed: () => context.go('/settings'),
+                  icon: const Icon(LucideIcons.settings, size: 20),
+                ),
+                const SizedBox(width: 8),
+              ],
             ],
           ),
           
