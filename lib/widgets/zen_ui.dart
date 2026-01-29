@@ -183,8 +183,9 @@ class ZenSliverAppBar extends StatelessWidget {
 class MovieCard extends ConsumerWidget {
   final DoubanSubject movie;
   final VoidCallback onTap;
+  final String? badge;
 
-  const MovieCard({Key? key, required this.movie, required this.onTap}) : super(key: key);
+  const MovieCard({Key? key, required this.movie, required this.onTap, this.badge}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -193,9 +194,35 @@ class MovieCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: CoverImage(imageUrl: movie.cover),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CoverImage(imageUrl: movie.cover),
+              ),
+              if (badge != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          badge!,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(

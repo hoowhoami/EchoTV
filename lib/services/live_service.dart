@@ -20,16 +20,11 @@ class LiveService {
       final isTeenageMode = _ref.read(teenageModeProvider);
       if (!isTeenageMode) return channels;
 
-      final filteredKeywords = [
-        'adult', 'xxx', 'porn', '成人', '福利', '伦理', '黄色', '性感', '18+', 'av', '诱惑'
-      ];
+      final filteredKeywords = _ref.read(filteredKeywordsProvider);
 
       return channels.where((c) {
         final content = '${c.name}${c.group ?? ''}'.toLowerCase();
-        for (var kw in filteredKeywords) {
-          if (content.contains(kw)) return false;
-        }
-        return true;
+        return !filteredKeywords.any((kw) => content.contains(kw.toLowerCase()));
       }).toList();
     } catch (e) {
       return [];

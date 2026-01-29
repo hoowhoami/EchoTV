@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/site.dart';
-import 'config_service.dart';
 import '../providers/settings_provider.dart';
 
 final cmsServiceProvider = Provider((ref) => CmsService(ref));
@@ -71,11 +70,7 @@ class CmsService {
 
       final List<VideoDetail> results = [];
       final isTeenageMode = _ref.read(teenageModeProvider);
-      final filteredKeywords = [
-        '成人', '福利', '伦理', '黄色', '性感', '禁片', '写真', '三级', '情色', 
-        '美女', '微拍', '自拍', '模特', '内衣', '丝袜', '限制级', '激情', 
-        '18+', 'xxx', 'av', '偷拍', '女主播', '诱惑', '无码', '有码'
-      ];
+      final filteredKeywords = _ref.read(filteredKeywordsProvider);
 
       for (var item in list) {
         try {
@@ -84,11 +79,8 @@ class CmsService {
             bool shouldFilter = false;
             if (isTeenageMode) {
               final content = '${detail.title}${detail.typeName ?? ''}${detail.sourceName}'.toLowerCase();
-              for (var kw in filteredKeywords) {
-                if (content.contains(kw)) {
-                  shouldFilter = true;
-                  break;
-                }
+              if (filteredKeywords.any((kw) => content.contains(kw.toLowerCase()))) {
+                shouldFilter = true;
               }
             }
             if (!shouldFilter) {

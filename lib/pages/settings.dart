@@ -89,9 +89,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     icon: LucideIcons.userCheck,
                     title: '青少年模式',
                     value: ref.watch(teenageModeProvider),
-                    showDivider: false,
                     onChanged: (val) => ref.read(teenageModeProvider.notifier).setEnabled(val),
                   ),
+                  if (ref.watch(teenageModeProvider))
+                    _buildNavigationItem(
+                      icon: LucideIcons.filter,
+                      title: '过滤关键字管理',
+                      showDivider: false,
+                      onTap: () => _showKeywordsEditor(),
+                    ),
                 ]),
 
                 _buildSectionTitle('数据源管理'),
@@ -336,6 +342,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await ref.read(configServiceProvider).setDoubanImageProxyType(val as String);
       _loadSettings();
     });
+  }
+
+  void _showKeywordsEditor() {
+    final keywords = ref.read(filteredKeywordsProvider);
+    final controller = TextEditingController(text: keywords.join(', '));
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('过滤关键字管理', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '输入关键字，用逗号分隔...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '提示：关键字之间使用中文或英文逗号分隔。开启青少年模式后，包含这些词的资源将被过滤。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(filteredKeywordsProvider.notifier).setKeywords(ConfigService.defaultKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('恢复默认'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              final newKeywords = controller.text
+                  .split(RegExp(r'[,，]'))
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              ref.read(filteredKeywordsProvider.notifier).setKeywords(newKeywords);
+              Navigator.pop(context);
+            },
+            child: Text('保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSimplePicker(String title, Map<dynamic, String> options, dynamic currentVal, Function(dynamic) onSelect) {

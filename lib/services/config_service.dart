@@ -15,7 +15,14 @@ class ConfigService {
   static const String keyDoubanProxy = 'douban_proxy_type';
   static const String keyDoubanImageProxy = 'douban_image_proxy_type';
   static const String keyTeenageMode = 'teenage_mode';
+  static const String keyFilteredKeywords = 'filtered_keywords';
   static const String keySiteName = 'site_name';
+
+  static const List<String> defaultKeywords = [
+    '成人', '福利', '伦理', '黄色', '性感', '禁片', '写真', '三级', '情色', 
+    '美女', '微拍', '自拍', '模特', '内衣', '丝袜', '限制级', '激情', 
+    '18+', 'xxx', 'av', '偷拍', '女主播', '诱惑', '无码', '有码'
+  ];
   static const String keyAnnouncement = 'announcement';
   static const String keyFavorites = 'favorites';
   static const String keyHistory = 'play_history';
@@ -120,6 +127,16 @@ class ConfigService {
   Future<void> setTeenageMode(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(keyTeenageMode, enabled);
+  }
+
+  Future<List<String>> getFilteredKeywords() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(keyFilteredKeywords) ?? defaultKeywords;
+  }
+
+  Future<void> saveFilteredKeywords(List<String> keywords) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(keyFilteredKeywords, keywords);
   }
 
   /// 处理豆瓣图片 URL，根据配置的代理类型进行转换
