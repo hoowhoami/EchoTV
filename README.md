@@ -14,6 +14,8 @@
 
 EchoTV 采用 **Zen-iOS Hybrid** 设计语言，追求物理触感、光学模糊与工业美学的平衡，在不同平台提供一致的极简交互体验。
 
+- **视觉灵感**：本项目在交互与视觉风格上深受 [LunaTV](https://github.com/MoonTechLab/LunaTV.git) 的启发，并在此基础上针对 Flutter 全平台特性进行了深度重构与优化。
+
 ---
 
 ## 🌟 核心特性
