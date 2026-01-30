@@ -1,0 +1,32 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- 透明背景，为 macOS 系统圆角留出空间 -->
+  <rect width="1024" height="1024" fill="none"/>
+
+  <!-- 内容组，缩小到 82% 的安全区域 (约 840x840)，居中放置 -->
+  <g transform="translate(92, 92)">
+    <!-- 黑色背景，圆角 -->
+    <rect width="840" height="840" fill="#000000" rx="148"/>
+
+    <!-- Echo 文字 -->
+    <text x="420" y="390"
+          font-family="Arial, sans-serif"
+          font-size="148"
+          font-weight="bold"
+          fill="#FFFFFF"
+          text-anchor="middle"
+          letter-spacing="6">Echo</text>
+
+    <!-- TV 文字 -->
+    <text x="420" y="560"
+          font-family="Arial, sans-serif"
+          font-size="164"
+          font-weight="bold"
+          fill="#4A9EFF"
+          text-anchor="middle"
+          letter-spacing="10">TV</text>
+
+    <!-- 装饰性波纹效果 -->
+    <circle cx="420" cy="420" r="312" fill="none" stroke="#4A9EFF" stroke-width="1.6" opacity="0.2"/>
+    <circle cx="420" cy="420" r="345" fill="none" stroke="#4A9EFF" stroke-width="0.8" opacity="0.1"/>
+  </g>
+</svg>

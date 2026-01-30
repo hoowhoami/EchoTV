@@ -107,13 +107,13 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/app_icon.png"  # iOS 使用满版图标（无透明边框）
   remove_alpha_ios: true  # iOS 不允许透明通道
 
-  # macOS 特殊配置
+  # macOS 特殊配置 - 使用带透明边框的图标
   macos:
     generate: true
-    image_path: "assets/icon/app_icon.png"
+    image_path: "assets/icon/app_icon_macos.png"  # macOS 使用带透明边框的图标
 
   # Windows 配置
   windows:
