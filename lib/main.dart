@@ -7,7 +7,6 @@ import 'package:window_manager/window_manager.dart';
 import 'core/theme.dart';
 import 'services/config_service.dart';
 import 'services/subscription_service.dart';
-import 'services/update_service.dart';
 import 'widgets/edit_dialog.dart';
 import 'widgets/zen_ui.dart';
 import 'pages/home.dart';

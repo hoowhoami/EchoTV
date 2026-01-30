@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:bs58/bs58.dart';
@@ -22,7 +21,7 @@ class SubscriptionService {
       final response = await _dio.get(url);
       var data = response.data;
       
-      // 如果返回的是字符串，尝试 Base58 解码（参考 LunaTV）
+      // 如果返回的是字符串，尝试 Base58 解码
       if (data is String) {
         data = _tryDecode(data);
         try {

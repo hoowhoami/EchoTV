@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../services/douban_service.dart';
-import '../services/config_service.dart';
 import '../services/update_service.dart';
 import '../providers/history_provider.dart';
 import '../models/movie.dart';

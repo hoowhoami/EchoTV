@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/movie.dart';
 import 'config_service.dart';
-import '../providers/settings_provider.dart';
 
 final doubanServiceProvider = Provider((ref) => DoubanService(ref));
 
@@ -160,8 +159,8 @@ class DoubanService {
       final tags = <String>[];
       final selectedCategories = <String, String>{};
 
-      // Some callers (e.g. LunaTV port) may pass the filter under the
-      // legacy key 'type'. Support both for robustness.
+      // Some callers may pass the filter under the legacy key 'type'.
+      // Support both for robustness.
       final category = filters['category'] ?? filters['type'];
       final format = filters['format'];
       final region = filters['region'];

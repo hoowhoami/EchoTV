@@ -14,7 +14,6 @@ import '../services/config_service.dart';
 import '../providers/history_provider.dart';
 import '../services/video_quality_service.dart';
 import '../services/source_optimizer_service.dart';
-import '../widgets/zen_ui.dart';
 import '../widgets/cover_image.dart';
 
 class VideoDetailPage extends ConsumerStatefulWidget {
@@ -266,7 +265,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       controller.addListener(() {
         if (!mounted) return;
         
-        // 处理播放中出现的错误（参考 LunaTV 的 recoverMediaError 思路）
+        // 处理播放中出现的错误
         if (controller.value.hasError) {
           final error = controller.value.errorDescription;
           debugPrint('播放器运行时错误: $error');
