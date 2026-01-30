@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/theme.dart';
 import 'services/config_service.dart';
+import 'services/subscription_service.dart';
 import 'services/update_service.dart';
 import 'widgets/edit_dialog.dart';
 import 'widgets/zen_ui.dart';
@@ -134,10 +135,9 @@ class _TermsGateState extends ConsumerState<TermsGate> {
         _hasAgreed = agreed;
         _isChecking = false;
       });
-      // 如果已同意协议，不再这里检查更新（移至 HomePage）
-      // if (agreed) {
-      //   UpdateService.checkUpdate(context);
-      // }
+      if (agreed) {
+        ref.read(subscriptionServiceProvider).checkAndRefreshAutoUpdateSubscriptions();
+      }
     }
   }
 
@@ -145,8 +145,7 @@ class _TermsGateState extends ConsumerState<TermsGate> {
     await ref.read(configServiceProvider).setHasAgreedTerms(true);
     if (mounted) {
       setState(() => _hasAgreed = true);
-      // 同意后不再这里检查更新（移至 HomePage）
-      // UpdateService.checkUpdate(context);
+      ref.read(subscriptionServiceProvider).checkAndRefreshAutoUpdateSubscriptions();
     }
   }
 

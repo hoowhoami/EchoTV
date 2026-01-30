@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/site.dart';
 import '../models/live.dart';
+import '../models/subscription.dart';
 
 final configServiceProvider = Provider((ref) => ConfigService());
 
@@ -11,6 +12,7 @@ class ConfigService {
   static const String keySites = 'cms_sites';
   static const String keyLiveSources = 'live_sources';
   static const String keyCategories = 'custom_categories';
+  static const String keySubscriptions = 'subscriptions';
   static const String keyThemeMode = 'theme_mode';
   static const String keyDoubanProxy = 'douban_proxy_type';
   static const String keyDoubanImageProxy = 'douban_image_proxy_type';
@@ -38,12 +40,39 @@ class ConfigService {
     await prefs.setBool(keyHasAgreedTerms, agreed);
   }
 
+  Future<List<Subscription>> getSubscriptions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList(keySubscriptions);
+    if (data == null) return [];
+    return data.map((s) => Subscription.fromJson(jsonDecode(s))).toList();
+  }
+
+  Future<void> saveSubscriptions(List<Subscription> subscriptions) async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = subscriptions.map((s) => jsonEncode(s.toJson())).toList();
+    await prefs.setStringList(keySubscriptions, data);
+  }
+
+  Future<Set<String>> getEnabledSubscriptionIds() async {
+    final subs = await getSubscriptions();
+    return subs.where((s) => s.enabled).map((s) => s.id).toSet();
+  }
+
   Future<void> clearAllData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
 
   Future<List<SiteConfig>> getSites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList(keySites);
+    if (data == null) return [];
+    final sites = data.map((s) => SiteConfig.fromJson(jsonDecode(s))).toList();
+    final enabledSubIds = await getEnabledSubscriptionIds();
+    return sites.where((s) => s.subscriptionId == null || enabledSubIds.contains(s.subscriptionId)).toList();
+  }
+
+  Future<List<SiteConfig>> getSitesAll() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getStringList(keySites);
     if (data == null) return [];
@@ -60,6 +89,15 @@ class ConfigService {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getStringList(keyLiveSources);
     if (data == null) return [];
+    final sources = data.map((s) => LiveSource.fromJson(jsonDecode(s))).toList();
+    final enabledSubIds = await getEnabledSubscriptionIds();
+    return sources.where((s) => s.subscriptionId == null || enabledSubIds.contains(s.subscriptionId)).toList();
+  }
+
+  Future<List<LiveSource>> getLiveSourcesAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList(keyLiveSources);
+    if (data == null) return [];
     return data.map((s) => LiveSource.fromJson(jsonDecode(s))).toList();
   }
 
@@ -73,6 +111,15 @@ class ConfigService {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getStringList(keyCategories);
     if (data == null) return [];
+    final categories = data.map((s) => CustomCategory.fromJson(jsonDecode(s))).toList();
+    final enabledSubIds = await getEnabledSubscriptionIds();
+    return categories.where((s) => s.subscriptionId == null || enabledSubIds.contains(s.subscriptionId)).toList();
+  }
+
+  Future<List<CustomCategory>> getCategoriesAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getStringList(keyCategories);
+    if (data == null) return [];
     return data.map((s) => CustomCategory.fromJson(jsonDecode(s))).toList();
   }
 
@@ -80,6 +127,23 @@ class ConfigService {
     final prefs = await SharedPreferences.getInstance();
     final data = categories.map((s) => jsonEncode(s.toJson())).toList();
     await prefs.setStringList(keyCategories, data);
+  }
+
+  Future<void> removeSubscriptionData(String subscriptionId) async {
+    // Remove sites
+    final sites = await getSitesAll();
+    sites.removeWhere((s) => s.subscriptionId == subscriptionId);
+    await saveSites(sites);
+
+    // Remove live sources
+    final lives = await getLiveSourcesAll();
+    lives.removeWhere((l) => l.subscriptionId == subscriptionId);
+    await saveLiveSources(lives);
+
+    // Remove categories
+    final cats = await getCategoriesAll();
+    cats.removeWhere((c) => c.subscriptionId == subscriptionId);
+    await saveCategories(cats);
   }
 
   Future<String> getSiteName() async {

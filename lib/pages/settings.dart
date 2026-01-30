@@ -14,6 +14,7 @@ import '../widgets/edit_dialog.dart';
 import 'source_manage.dart';
 import 'category_manage.dart';
 import 'live_manage.dart';
+import 'subscription_manage.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -151,10 +152,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                 _buildSectionTitle('配置同步'),
                 _buildSettingGroup([
-                  _buildActionItem(
+                  _buildNavigationItem(
                     icon: LucideIcons.refreshCw,
-                    title: '同步远程配置',
-                    onTap: _showRemoteSync,
+                    title: '订阅管理',
+                    onTap: () => _pushPage(const SubscriptionManagePage()),
                   ),
                   _buildActionItem(
                     icon: LucideIcons.fileJson,
@@ -584,44 +585,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               }
             },
             child: const Text('导入'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRemoteSync() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => EditDialog(
-        title: const Text('同步远程配置', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: '输入订阅 URL (JSON)',
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          ),
-        ),
-        actions: [
-          ZenButton(
-            isSecondary: true,
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ZenButton(
-            onPressed: () async {
-              try {
-                await SubscriptionService(ref.read(configServiceProvider)).syncFromUrl(controller.text);
-                _loadSettings();
-                if (mounted) Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
-              }
-            },
-            child: const Text('同步'),
           ),
         ],
       ),
