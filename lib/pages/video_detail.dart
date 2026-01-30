@@ -196,12 +196,13 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   }
 
   void _applyIncrementalOptimization() async {
-    if (!mounted || _isInitializing) return;
+    // 更加严格的保护：只要播放器实例已经存在，或者正在初始化，就不再进行增量纠偏
+    if (!mounted || _isInitializing || _videoController != null) return;
     final optimizer = ref.read(sourceOptimizerServiceProvider);
     final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
     
-    // 仅更新当前源引用，不立即初始化（交给动态轮询或最终切换处理）
-    if (mounted && _currentSource != result.bestSource && !_isPlaying) {
+    // 仅更新当前源引用，不立即初始化
+    if (mounted && _currentSource != result.bestSource && _videoController == null) {
       setState(() => _currentSource = result.bestSource);
     }
   }
@@ -212,16 +213,20 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       final optimizer = ref.read(sourceOptimizerServiceProvider);
       final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
       if (mounted) {
-        final bool shouldAutoSwitch = _currentSource != result.bestSource && 
-            (_videoController == null || _videoController!.value.position < const Duration(seconds: 2));
+        // 核心优化：只要播放器 controller 已经创建，不管是否在播放（哪怕是暂停），都不再自动切换
+        final bool hasPlayer = _videoController != null;
+        final bool shouldAutoSwitch = _currentSource != result.bestSource && !hasPlayer && !_isInitializing;
 
         setState(() {
           _qualityInfoMap.addAll(result.qualityInfoMap);
           _scoreMap.addAll(result.scoreMap);
           _isOptimizing = false;
           if (shouldAutoSwitch) {
+            debugPrint('优选结果：当前源非最佳且无播放实例，执行自动切换');
             _currentSource = result.bestSource;
             _initializePlayer(_currentSource!.playGroups.first.urls[_currentEpisodeIndex], _currentEpisodeIndex, autoPlay: false, isAutoSwitch: true);
+          } else if (_currentSource != result.bestSource && hasPlayer) {
+            debugPrint('优选结果：虽然有更好的源，但用户已开始使用当前源（暂停或播放中），放弃自动切换');
           }
         });
       }
@@ -231,26 +236,28 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   }
 
   Future<void> _initializePlayer(String url, int index, {double? resumePosition, bool autoPlay = true, bool isAutoSwitch = false}) async {
+    // 如果正在初始化且不是重试请求，则忽略（防止并发初始化）
     if (_isInitializing && _retryCount == 0) return;
+    
     _isInitializing = true;
+    if (mounted) setState(() {});
 
     try {
-      // 彻底销毁旧的控制器，确保原生层释放
+      // 彻底销毁旧的控制器
       final oldPlayer = _videoController;
       final oldChewie = _chewieController;
       _videoController = null;
       _chewieController = null;
+      _isPlaying = false; // 重置播放状态
       if (mounted) setState(() {});
       
       oldChewie?.dispose();
       await oldPlayer?.dispose();
       
-      // 给原生层一点点喘息时间，防止 byte range 错误
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       if (!mounted) return;
 
-      // 优化：添加 User-Agent 和 格式提示，解决 Apple 平台 OSStatus error -12847
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(url),
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
@@ -263,22 +270,29 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       _videoController = controller;
 
       controller.addListener(() {
-        if (!mounted) return;
+        if (!mounted || _videoController != controller) return;
         
-        // 处理播放中出现的错误
         if (controller.value.hasError) {
           final error = controller.value.errorDescription;
           debugPrint('播放器运行时错误: $error');
           
-          // 如果已经在播放了且出现错误，尝试原地重启一次
-          if (_isPlaying && _retryCount < _maxRetries) {
+          if (_retryCount < _maxRetries) {
             _retryCount++;
             _initializePlayer(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true);
-            return;
+          } else {
+            _handlePlaybackFailure(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true, isAutoSwitch: isAutoSwitch);
           }
+          return;
         }
 
         if (!controller.value.isInitialized) return;
+        
+        // 只有播放成功 5 秒后才重置重试计数
+        if (controller.value.isPlaying && controller.value.position.inSeconds >= 5 && _retryCount > 0) {
+          _retryCount = 0;
+          debugPrint('播放稳定，重置重试计数');
+        }
+
         if (controller.value.isPlaying && controller.value.position.inSeconds % 5 == 0) _savePlayRecord();
         if (controller.value.position >= controller.value.duration && controller.value.duration > Duration.zero && !controller.value.isPlaying) {
           if (_autoPlayNext) _playNextEpisode();
@@ -291,61 +305,79 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         await controller.seekTo(Duration(seconds: resumePosition.toInt()));
       }
 
-      if (mounted) {
+      if (mounted && _videoController == controller) {
         _createChewieController(autoPlay: autoPlay);
-        _retryCount = 0; // 初始化成功，重置重试计数
+        _isInitializing = false; // 初始化成功
+        setState(() {});
       }
     } catch (e) {
       debugPrint('播放器初始化失败: $e');
-      
       if (mounted) {
-        if (_retryCount < _maxRetries) {
-          // 1. 尝试原地重试
-          _retryCount++;
-          // 不在这里重置 _isInitializing，防止 UI 闪烁显示“播放失败”
-          debugPrint('尝试第 $_retryCount 次重试...');
-          await Future.delayed(Duration(milliseconds: 800 * _retryCount));
-          return _initializePlayer(url, index, resumePosition: resumePosition, autoPlay: autoPlay, isAutoSwitch: isAutoSwitch);
-        } else {
-          // 2. 重试耗尽，标记当前源为故障并尝试自动换源（Failover）
-          final key = '${_currentSource?.source}-${_currentSource?.id}';
-          _qualityInfoMap[key] = VideoQualityInfo.error();
-          
-          if (!isAutoSwitch) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('当前线路加载失败，正在尝试自动切换...'), 
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 2),
-              )
-            );
-          }
-
-          // 自动寻找下一个最佳源
-          final optimizer = ref.read(sourceOptimizerServiceProvider);
-          final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
-          
-          if (mounted && result.bestSource != _currentSource) {
-            _currentSource = result.bestSource;
-            _retryCount = 0;
-            _isInitializing = false;
-            return _initializePlayer(
-              _currentSource!.playGroups.first.urls[index], 
-              index, 
-              resumePosition: resumePosition, 
-              autoPlay: autoPlay, 
-              isAutoSwitch: true
-            );
-          } else {
-            if (!isAutoSwitch) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('播放失败: 所有可用线路均无法连接'), backgroundColor: Colors.redAccent));
-            }
-          }
-        }
+        await _handlePlaybackFailure(url, index, resumePosition: resumePosition, autoPlay: autoPlay, isAutoSwitch: isAutoSwitch);
       }
     } finally {
-      _isInitializing = false;
-      if (mounted) setState(() {});
+      // 只有在没有触发下一次初始化/重试的情况下，才重置初始化状态
+      if (mounted && (_retryCount == 0 || _retryCount > _maxRetries)) {
+        _isInitializing = false;
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  /// 统一处理播放失败及自动换源逻辑
+  Future<void> _handlePlaybackFailure(String url, int index, {double? resumePosition, bool autoPlay = true, bool isAutoSwitch = false}) async {
+    if (!mounted) return;
+
+    if (_retryCount < _maxRetries) {
+      // 1. 尝试原地重试
+      _retryCount++;
+      debugPrint('尝试第 $_retryCount 次重试...');
+      await Future.delayed(Duration(milliseconds: 1000 * _retryCount));
+      return _initializePlayer(url, index, resumePosition: resumePosition, autoPlay: autoPlay, isAutoSwitch: isAutoSwitch);
+    } else {
+      // 2. 重试耗尽，标记当前源为故障并尝试自动换源
+      final key = '${_currentSource?.source}-${_currentSource?.id}';
+      _qualityInfoMap[key] = VideoQualityInfo.error();
+      _scoreMap[key] = -1.0; // 降低权重
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('当前线路 [${_currentSource?.sourceName}] 播放失败，正在尝试自动切换...'), 
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          )
+        );
+      }
+
+      // 自动寻找下一个最佳源
+      final optimizer = ref.read(sourceOptimizerServiceProvider);
+      final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
+      
+      if (mounted && result.bestSource != _currentSource) {
+        debugPrint('自动切换到备用源: ${result.bestSource.sourceName}');
+        _currentSource = result.bestSource;
+        _retryCount = 0; // 换源后重置计数
+        _isPlaying = false;
+        _isInitializing = false;
+        return _initializePlayer(
+          _currentSource!.playGroups.first.urls[index], 
+          index, 
+          resumePosition: resumePosition, 
+          autoPlay: autoPlay, 
+          isAutoSwitch: true
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('播放失败: 所有可用线路均无法连接'), backgroundColor: Colors.redAccent)
+          );
+          setState(() {
+            _isInitializing = false;
+            _isPlaying = false;
+          });
+        }
+      }
     }
   }
 
