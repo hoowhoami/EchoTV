@@ -85,11 +85,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               Text(title, style: Theme.of(context).textTheme.titleLarge),
               GestureDetector(
                 onTap: () => context.go(route),
-                child: Row(
-                  children: [
-                    Text('查看更多', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12)),
-                    Icon(Icons.chevron_right, size: 16, color: Theme.of(context).colorScheme.secondary),
-                  ],
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Row(
+                    children: [
+                      Text('查看更多', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12)),
+                      Icon(Icons.chevron_right, size: 16, color: Theme.of(context).colorScheme.secondary),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -231,7 +234,48 @@ class _HomePageState extends ConsumerState<HomePage> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: Text('继续观看', style: Theme.of(context).textTheme.titleLarge),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('继续观看', style: Theme.of(context).textTheme.titleLarge),
+              GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('清空历史'),
+                      content: const Text('确定要清空所有观看记录吗？'),
+                      actions: [
+                        ZenButton(
+                          isSecondary: true,
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('取消'),
+                        ),
+                        ZenButton(
+                          backgroundColor: Colors.redAccent,
+                          onPressed: () {
+                            ref.read(historyProvider.notifier).clearHistory();
+                            Navigator.pop(context);
+                          },
+                          child: const Text('清空'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Text(
+                    '清空',
+                    style: TextStyle(
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         SizedBox(
           height: 110, // 略微压缩高度，更精致
@@ -241,127 +285,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             physics: const BouncingScrollPhysics(),
             itemCount: history.length,
             itemBuilder: (context, index) {
-              final record = history[index];
-              final progress = record.totalTime > 0 ? record.playTime / record.totalTime : 0.0;
-              
-              return GestureDetector(
-                onTap: () {
-                  final subject = DoubanSubject(
-                    id: '',
-                    title: record.searchTitle,
-                    rate: '0.0',
-                    cover: record.cover,
-                    year: record.year,
-                  );
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (context) => VideoDetailPage(subject: subject),
-                  ));
-                },
-                child: Container(
-                  width: 260, // 增加宽度，排版更从容
-                  margin: const EdgeInsets.only(right: 16),
-                  child: ZenGlassContainer(
-                    borderRadius: 18,
-                    blur: 30,
-                    child: Stack(
-                      children: [
-                        // 背景微弱氛围
-                        Positioned(
-                          right: -20,
-                          top: -20,
-                          bottom: -20,
-                          width: 140,
-                          child: Opacity(
-                            opacity: 0.1,
-                            child: CoverImage(
-                              imageUrl: record.cover,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        
-                        Row(
-                          children: [
-                            // 左侧封面
-                            SizedBox(
-                              width: 74,
-                              height: 110,
-                              child: CoverImage(
-                                imageUrl: record.cover,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            
-                            // 右侧信息
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(14.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      record.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '观看至第 ${record.index + 1} 集',
-                                      style: TextStyle(
-                                        fontSize: 11, 
-                                        color: theme.colorScheme.secondary.withValues(alpha: 0.8),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    
-                                    // 胶囊式进度条容器
-                                    Container(
-                                      height: 4,
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                      child: FractionallySizedBox(
-                                        alignment: Alignment.centerLeft,
-                                        widthFactor: progress.clamp(0.01, 1.0),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: theme.colorScheme.primary,
-                                            borderRadius: BorderRadius.circular(2),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                                                blurRadius: 4,
-                                              )
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${(progress * 100).toInt()}% 已观看',
-                                      style: TextStyle(
-                                        fontSize: 9, 
-                                        color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
+              return _ContinueWatchingCard(record: history[index]);
             },
           ),
         ),
@@ -430,6 +354,177 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ContinueWatchingCard extends ConsumerStatefulWidget {
+  final PlayRecord record;
+  const _ContinueWatchingCard({required this.record});
+
+  @override
+  ConsumerState<_ContinueWatchingCard> createState() => _ContinueWatchingCardState();
+}
+
+class _ContinueWatchingCardState extends ConsumerState<_ContinueWatchingCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final record = widget.record;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final progress = record.totalTime > 0 ? record.playTime / record.totalTime : 0.0;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: Container(
+        width: 260,
+        margin: const EdgeInsets.only(right: 16),
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: () {
+                final subject = DoubanSubject(
+                  id: '',
+                  title: record.searchTitle,
+                  rate: '0.0',
+                  cover: record.cover,
+                  year: record.year,
+                );
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => VideoDetailPage(subject: subject),
+                ));
+              },
+              child: ZenGlassContainer(
+                borderRadius: 18,
+                blur: 30,
+                child: Stack(
+                  children: [
+                    // 背景微弱氛围
+                    Positioned(
+                      right: -20,
+                      top: -20,
+                      bottom: -20,
+                      width: 140,
+                      child: Opacity(
+                        opacity: 0.1,
+                        child: CoverImage(
+                          imageUrl: record.cover,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        // 左侧封面
+                        SizedBox(
+                          width: 74,
+                          height: 110,
+                          child: CoverImage(
+                            imageUrl: record.cover,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        // 右侧信息
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(14.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  record.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '观看至第 ${record.index + 1} 集',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.secondary.withValues(alpha: 0.8),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                // 胶囊式进度条容器
+                                Container(
+                                  height: 4,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                  child: FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: progress.clamp(0.01, 1.0),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary,
+                                        borderRadius: BorderRadius.circular(2),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                                            blurRadius: 4,
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${(progress * 100).toInt()}% 已观看',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // 删除按钮
+            if (_isHovered)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: GestureDetector(
+                  onTap: () {
+                    ref.read(historyProvider.notifier).removeRecord(record.searchTitle);
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

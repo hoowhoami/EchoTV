@@ -426,18 +426,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
         actions: [
-          TextButton(
+          ZenButton(
+            isSecondary: true,
             onPressed: () {
               ref.read(filteredKeywordsProvider.notifier).setKeywords(ConfigService.defaultKeywords);
               Navigator.pop(context);
             },
             child: const Text('恢复默认'),
           ),
-          TextButton(
+          ZenButton(
+            isSecondary: true,
             onPressed: () => Navigator.pop(context),
-            child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+            child: const Text('取消'),
           ),
-          TextButton(
+          ZenButton(
             onPressed: () {
               final newKeywords = controller.text
                   .split(RegExp(r'[,，]'))
@@ -447,7 +449,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ref.read(filteredKeywordsProvider.notifier).setKeywords(newKeywords);
               Navigator.pop(context);
             },
-            child: Text('保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+            child: const Text('保存'),
           ),
         ],
       ),
@@ -565,8 +567,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-          TextButton(
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
             onPressed: () async {
               try {
                 final json = jsonDecode(controller.text);
@@ -577,7 +583,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('解析失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
               }
             },
-            child: Text('导入', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+            child: const Text('导入'),
           ),
         ],
       ),
@@ -600,8 +606,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-          TextButton(
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
             onPressed: () async {
               try {
                 await SubscriptionService(ref.read(configServiceProvider)).syncFromUrl(controller.text);
@@ -611,7 +621,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('同步失败: $e'), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
               }
             },
-            child: Text('同步', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+            child: const Text('同步'),
           ),
         ],
       ),
@@ -652,7 +662,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
         actions: [
-          TextButton(
+          ZenButton(
+            isSecondary: true,
             onPressed: () => Navigator.pop(context),
             child: const Text('关闭'),
           ),
@@ -668,16 +679,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         title: const Text('确认清除数据？'),
         content: const Text('此操作将抹除所有站点配置、直播订阅、历史记录及偏好设置。应用将恢复到初始状态并需要重新同意用户协议。'),
         actions: [
-          TextButton(
+          ZenButton(
+            isSecondary: true,
             onPressed: () => Navigator.pop(context),
-            child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+            child: const Text('取消'),
           ),
-          TextButton(
+          ZenButton(
+            backgroundColor: Colors.redAccent,
             onPressed: () async {
               await ref.read(configServiceProvider).clearAllData();
               exit(0); // 清除后退出，确保下次启动重新加载
             },
-            child: const Text('确认清除并退出', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text('确认清除并退出'),
           ),
         ],
       ),

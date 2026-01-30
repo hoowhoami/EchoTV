@@ -13,6 +13,7 @@ class ZenButton extends StatefulWidget {
   final double borderRadius;
   final EdgeInsets padding;
   final double? height;
+  final bool isSecondary;
 
   const ZenButton({
     Key? key,
@@ -20,9 +21,10 @@ class ZenButton extends StatefulWidget {
     required this.onPressed,
     this.backgroundColor,
     this.foregroundColor,
-    this.borderRadius = 28,
-    this.padding = const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+    this.borderRadius = 14, // 稍微减小圆角，显得更现代
+    this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
     this.height,
+    this.isSecondary = false,
   }) : super(key: key);
 
   @override
@@ -31,38 +33,62 @@ class ZenButton extends StatefulWidget {
 
 class _ZenButtonState extends State<ZenButton> {
   bool _isPressed = false;
+  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onPressed,
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          height: widget.height,
-          padding: widget.padding,
-          alignment: widget.height != null ? Alignment.center : null,
-          decoration: BoxDecoration(
-            color: widget.backgroundColor ?? Theme.of(context).primaryColor,
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: DefaultTextStyle(
-            style: TextStyle(
-              color: widget.foregroundColor ?? Theme.of(context).colorScheme.onPrimary,
-              fontWeight: FontWeight.bold,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    Color bgColor;
+    Color fgColor;
+
+    if (widget.isSecondary) {
+      bgColor = widget.backgroundColor ?? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05));
+      fgColor = widget.foregroundColor ?? theme.colorScheme.onSurface;
+      if (_isHovered) bgColor = bgColor.withValues(alpha: bgColor.opacity + 0.05);
+    } else {
+      bgColor = widget.backgroundColor ?? theme.colorScheme.primary;
+      fgColor = widget.foregroundColor ?? (isDark ? Colors.black : Colors.white);
+      if (_isHovered) bgColor = bgColor.withValues(alpha: 0.9);
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onPressed,
+        child: AnimatedScale(
+          scale: _isPressed ? 0.96 : (_isHovered ? 1.02 : 1.0),
+          duration: const Duration(milliseconds: 200),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: widget.height,
+            padding: widget.padding,
+            alignment: widget.height != null ? Alignment.center : null,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(widget.borderRadius),
+              boxShadow: !widget.isSecondary && _isHovered ? [
+                BoxShadow(
+                  color: bgColor.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ] : null,
             ),
-            child: widget.child,
+            child: DefaultTextStyle(
+              style: TextStyle(
+                color: fgColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              child: widget.child,
+            ),
           ),
         ),
       ),
@@ -213,9 +239,11 @@ class MovieCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
@@ -269,6 +297,6 @@ class MovieCard extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }

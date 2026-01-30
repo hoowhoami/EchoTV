@@ -44,4 +44,13 @@ class HistoryNotifier extends Notifier<AsyncValue<List<PlayRecord>>> {
     state = const AsyncData([]);
     await service.saveHistory([]);
   }
+
+  Future<void> removeRecord(String searchTitle) async {
+    final service = ref.read(configServiceProvider);
+    final currentHistory = state.value ?? [];
+    final updatedHistory = currentHistory.where((r) => r.searchTitle != searchTitle).toList();
+    
+    state = AsyncData(updatedHistory);
+    await service.saveHistory(updatedHistory);
+  }
 }
