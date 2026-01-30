@@ -134,10 +134,10 @@ class _TermsGateState extends ConsumerState<TermsGate> {
         _hasAgreed = agreed;
         _isChecking = false;
       });
-      // 如果已同意协议，启动时静默检查更新
-      if (agreed) {
-        UpdateService.checkUpdate(context);
-      }
+      // 如果已同意协议，不再这里检查更新（移至 HomePage）
+      // if (agreed) {
+      //   UpdateService.checkUpdate(context);
+      // }
     }
   }
 
@@ -145,8 +145,8 @@ class _TermsGateState extends ConsumerState<TermsGate> {
     await ref.read(configServiceProvider).setHasAgreedTerms(true);
     if (mounted) {
       setState(() => _hasAgreed = true);
-      // 同意后也检查一次更新
-      UpdateService.checkUpdate(context);
+      // 同意后不再这里检查更新（移至 HomePage）
+      // UpdateService.checkUpdate(context);
     }
   }
 

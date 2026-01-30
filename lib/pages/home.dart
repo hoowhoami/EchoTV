@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../services/douban_service.dart';
 import '../services/config_service.dart';
+import '../services/update_service.dart';
 import '../providers/history_provider.dart';
 import '../models/movie.dart';
 import '../models/site.dart';
@@ -38,6 +39,20 @@ class _HomePageState extends ConsumerState<HomePage> {
   final Map<String, ScrollController> _scrollControllers = {};
   final Map<String, bool> _showLeftArrow = {};
   final Map<String, bool> _showRightArrow = {};
+  
+  static bool _hasCheckedUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 启动时自动检查更新
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_hasCheckedUpdate) {
+        _hasCheckedUpdate = true;
+        UpdateService.checkUpdate(context);
+      }
+    });
+  }
 
   @override
   void dispose() {
