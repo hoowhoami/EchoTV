@@ -118,7 +118,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
       body: CustomScrollView(
         slivers: [
           ZenSliverAppBar(
-            title: '分类管理',
+            title: '分类映射管理',
             subtitle: '自定义影视分类映射规则',
             actions: [
               IconButton(onPressed: () => _showCategoryDialog(), icon: const Icon(LucideIcons.plusCircle, size: 20)),

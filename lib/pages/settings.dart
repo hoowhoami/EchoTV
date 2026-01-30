@@ -132,17 +132,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 _buildSettingGroup([
                   _buildNavigationItem(
                     icon: LucideIcons.database,
-                    title: '视频 CMS 站点',
+                    title: '视频源管理',
                     onTap: () => _pushPage(const SourceManagePage()),
                   ),
                   _buildNavigationItem(
                     icon: LucideIcons.layers,
-                    title: '自定义分类映射',
+                    title: '分类映射管理',
                     onTap: () => _pushPage(const CategoryManagePage()),
                   ),
                   _buildNavigationItem(
                     icon: LucideIcons.tv,
-                    title: '直播 M3U 订阅',
+                    title: '直播源管理',
                     showDivider: false,
                     onTap: () => _pushPage(const LiveManagePage()),
                   ),
@@ -374,7 +374,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   void _showProxyPicker() {
-    _showSimplePicker('选择 API 代理', {
+    _showSimplePicker('选择豆瓣 API 代理', {
       'tencent-cmlius': '腾讯云镜像',
       'aliyun-cmlius': '阿里云镜像',
       'none': '直连',
@@ -595,7 +595,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     showDialog(
       context: context,
       builder: (context) => EditDialog(
-        title: const Text('同步远程订阅', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('同步远程配置', style: TextStyle(fontWeight: FontWeight.bold)),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
@@ -640,7 +640,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     showDialog(
       context: context,
       builder: (context) => EditDialog(
-        title: const Text('免责申明'),
+        title: const Text('免责声明'),
         width: 460,
         content: const Column(
           mainAxisSize: MainAxisSize.min,
