@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
 final videoQualityServiceProvider = Provider((ref) => VideoQualityService());
 
@@ -44,24 +45,28 @@ class VideoQualityInfo {
 
 class VideoQualityService {
   final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 4),
-    receiveTimeout: const Duration(seconds: 4),
-    sendTimeout: const Duration(seconds: 4),
+    connectTimeout: const Duration(seconds: 5),
+    receiveTimeout: const Duration(seconds: 5),
+    sendTimeout: const Duration(seconds: 5),
   ));
 
   /// 检测视频质量（分辨率、速度、延迟）
   Future<VideoQualityInfo> detectQuality(String videoUrl) async {
     try {
-      // 1. 测量网络延迟
-      final pingTime = await _measurePingTime(videoUrl);
+      // 并发执行 Ping 和 内容质量检测
+      final results = await Future.wait([
+        _measurePingTime(videoUrl),
+        _detectVideoContentQuality(videoUrl),
+      ]);
 
-      // 2. 如果是 M3U8 文件，解析并测速
-      if (videoUrl.toLowerCase().contains('.m3u8')) {
-        return await _detectM3u8Quality(videoUrl, pingTime);
-      }
+      final pingTime = results[0] as int;
+      final contentInfo = results[1] as Map<String, dynamic>;
 
-      // 3. 如果是直链视频，直接测速
-      return await _detectDirectVideoQuality(videoUrl, pingTime);
+      return VideoQualityInfo(
+        quality: contentInfo['quality'] ?? '未知',
+        loadSpeed: contentInfo['loadSpeed'] ?? '未知',
+        pingTime: pingTime,
+      );
     } catch (e) {
       return VideoQualityInfo.error();
     }
@@ -81,79 +86,72 @@ class VideoQualityService {
       final endTime = DateTime.now();
       return endTime.difference(startTime).inMilliseconds;
     } catch (e) {
-      return 9999; // 失败返回最大延迟
+      return 9999;
     }
   }
 
-  /// 检测 M3U8 视频质量
-  Future<VideoQualityInfo> _detectM3u8Quality(String m3u8Url, int pingTime) async {
+  Future<Map<String, dynamic>> _detectVideoContentQuality(String videoUrl) async {
+    if (videoUrl.toLowerCase().contains('.m3u8')) {
+      return await _detectM3u8Content(videoUrl);
+    }
+    
+    // 直链视频测速
+    final speed = await _measureDownloadSpeed(videoUrl, maxBytes: 512 * 1024);
+    return {'quality': '未知', 'loadSpeed': speed};
+  }
+
+  Future<Map<String, dynamic>> _detectM3u8Content(String m3u8Url) async {
     try {
-      // 1. 下载 M3U8 文件
       final response = await _dio.get(m3u8Url);
-      final m3u8Content = response.data.toString();
-
-      // 2. 解析分辨率信息
-      String quality = _parseM3u8Resolution(m3u8Content);
-
-      // 3. 提取第一个 TS 片段 URL
-      final tsUrl = _extractFirstTsUrl(m3u8Content, m3u8Url);
-      if (tsUrl == null) {
-        return VideoQualityInfo(
-          quality: quality,
-          loadSpeed: '未知',
-          pingTime: pingTime,
-        );
+      final content = response.data.toString();
+      
+      // 1. 解析最高分辨率
+      String quality = _parseM3u8Resolution(content);
+      
+      // 2. 处理 Master Playlist (嵌套)
+      final subM3u8 = _extractFirstSubM3u8(content, m3u8Url);
+      if (subM3u8 != null) {
+        final subResult = await _detectM3u8Content(subM3u8);
+        if (subResult['quality'] != '未知') quality = subResult['quality'];
+        return subResult..['quality'] = quality;
       }
 
-      // 4. 测量 TS 片段下载速度
-      final loadSpeed = await _measureDownloadSpeed(tsUrl);
+      // 3. 提取 TS 视频流片段并测速
+      final tsUrl = _extractFirstTsUrl(content, m3u8Url);
+      if (tsUrl == null) return {'quality': quality, 'loadSpeed': '未知'};
 
-      return VideoQualityInfo(
-        quality: quality,
-        loadSpeed: loadSpeed,
-        pingTime: pingTime,
-      );
+      final speed = await _measureDownloadSpeed(tsUrl);
+      return {'quality': quality, 'loadSpeed': speed};
     } catch (e) {
-      return VideoQualityInfo.error();
+      return {'quality': '未知', 'loadSpeed': '未知'};
     }
   }
 
-  /// 检测直链视频质量
-  Future<VideoQualityInfo> _detectDirectVideoQuality(String videoUrl, int pingTime) async {
-    try {
-      // 测量下载速度
-      final loadSpeed = await _measureDownloadSpeed(videoUrl, maxBytes: 512 * 1024);
-
-      return VideoQualityInfo(
-        quality: '未知', // 直链无法获取分辨率
-        loadSpeed: loadSpeed,
-        pingTime: pingTime,
-      );
-    } catch (e) {
-      return VideoQualityInfo.error();
-    }
-  }
-
-  /// 解析 M3U8 文件中的分辨率信息
+  /// 解析 M3U8 文件中的最高分辨率
   String _parseM3u8Resolution(String m3u8Content) {
-    // 查找 RESOLUTION 标签
-    final resolutionMatch = RegExp(r'RESOLUTION=(\d+)x(\d+)').firstMatch(m3u8Content);
-    if (resolutionMatch != null) {
-      final width = int.parse(resolutionMatch.group(1)!);
-      return _getQualityFromWidth(width);
+    final matches = RegExp(r'RESOLUTION=(\d+)x(\d+)').allMatches(m3u8Content);
+    if (matches.isNotEmpty) {
+      int maxWidth = 0;
+      for (var match in matches) {
+        final width = int.parse(match.group(1)!);
+        if (width > maxWidth) maxWidth = width;
+      }
+      return _getQualityFromWidth(maxWidth);
     }
 
-    // 查找 BANDWIDTH 标签（备用方案）
-    final bandwidthMatch = RegExp(r'BANDWIDTH=(\d+)').firstMatch(m3u8Content);
-    if (bandwidthMatch != null) {
-      final bandwidth = int.parse(bandwidthMatch.group(1)!);
-      return _getQualityFromBandwidth(bandwidth);
+    final bwMatches = RegExp(r'BANDWIDTH=(\d+)').allMatches(m3u8Content);
+    if (bwMatches.isNotEmpty) {
+      int maxBw = 0;
+      for (var match in bwMatches) {
+        final bw = int.parse(match.group(1)!);
+        if (bw > maxBw) maxBw = bw;
+      }
+      return _getQualityFromBandwidth(maxBw);
     }
 
     return '未知';
   }
 
-  /// 根据宽度判断分辨率
   String _getQualityFromWidth(int width) {
     if (width >= 3840) return '4K';
     if (width >= 2560) return '2K';
@@ -163,7 +161,6 @@ class VideoQualityService {
     return 'SD';
   }
 
-  /// 根据带宽判断分辨率（粗略估计）
   String _getQualityFromBandwidth(int bandwidth) {
     if (bandwidth >= 8000000) return '1080p';
     if (bandwidth >= 5000000) return '720p';
@@ -171,69 +168,75 @@ class VideoQualityService {
     return 'SD';
   }
 
-  /// 提取 M3U8 中的第一个 TS 片段 URL
-  String? _extractFirstTsUrl(String m3u8Content, String baseUrl) {
-    final lines = m3u8Content.split('\n');
+  String? _extractFirstSubM3u8(String content, String baseUrl) {
+    final lines = content.split('\n');
     for (var line in lines) {
       line = line.trim();
-      if (line.isNotEmpty && !line.startsWith('#')) {
-        // 如果是相对路径，转换为绝对路径
-        if (!line.startsWith('http')) {
-          final baseUri = Uri.parse(baseUrl);
-          final tsUri = baseUri.resolve(line);
-          return tsUri.toString();
-        }
-        return line;
+      if (line.isNotEmpty && !line.startsWith('#') && line.toLowerCase().contains('.m3u8')) {
+        return _resolveUrl(baseUrl, line);
       }
     }
     return null;
   }
 
-  /// 测量下载速度
-  Future<String> _measureDownloadSpeed(String url, {int maxBytes = 256 * 1024}) async {
-    try {
-      final startTime = DateTime.now();
-      int downloadedBytes = 0;
+  String? _extractFirstTsUrl(String content, String baseUrl) {
+    final lines = content.split('\n');
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isNotEmpty && !line.startsWith('#')) {
+        if (!line.toLowerCase().contains('.m3u8')) {
+          return _resolveUrl(baseUrl, line);
+        }
+      }
+    }
+    return null;
+  }
 
-      await _dio.get(
+  String _resolveUrl(String baseUrl, String relativeUrl) {
+    if (relativeUrl.startsWith('http')) return relativeUrl;
+    final baseUri = Uri.parse(baseUrl);
+    return baseUri.resolve(relativeUrl).toString();
+  }
+
+  /// 真实流式测速
+  Future<String> _measureDownloadSpeed(String url, {int maxBytes = 1024 * 1024}) async {
+    final stopwatch = Stopwatch()..start();
+    int downloadedBytes = 0;
+
+    try {
+      final response = await _dio.get<ResponseBody>(
         url,
         options: Options(
           responseType: ResponseType.stream,
           followRedirects: true,
         ),
-        onReceiveProgress: (received, total) {
-          downloadedBytes = received;
-        },
-      ).timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          throw TimeoutException('Download timeout');
-        },
       );
 
-      final endTime = DateTime.now();
-      final duration = endTime.difference(startTime).inMilliseconds / 1000.0;
-
-      if (duration <= 0) {
-        return '未知';
+      final stream = response.data!.stream;
+      
+      await for (final chunk in stream) {
+        downloadedBytes += chunk.length;
+        // 测速满 1MB 或超过 3.5 秒则停止
+        if (downloadedBytes >= maxBytes || stopwatch.elapsedMilliseconds > 3500) {
+          break;
+        }
       }
+      stopwatch.stop();
 
-      // 计算速度（KB/s）
-      final speedKBps = (downloadedBytes / 1024) / duration;
+      final durationSec = stopwatch.elapsedMilliseconds / 1000.0;
+      if (durationSec <= 0 || downloadedBytes <= 0) return '未知';
 
-      // 格式化为 KB/s 或 MB/s
-      if (speedKBps >= 1024) {
-        return '${(speedKBps / 1024).toStringAsFixed(1)} MB/s';
+      final speedKBpsValue = (downloadedBytes / 1024) / durationSec;
+
+      if (speedKBpsValue >= 1024) {
+        return '${(speedKBpsValue / 1024).toStringAsFixed(1)} MB/s';
       } else {
-        return '${speedKBps.toStringAsFixed(1)} KB/s';
+        return '${speedKBpsValue.toStringAsFixed(1)} KB/s';
       }
     } catch (e) {
       return '未知';
+    } finally {
+      stopwatch.stop();
     }
   }
-}
-
-class TimeoutException implements Exception {
-  final String message;
-  TimeoutException(this.message);
 }
