@@ -15,8 +15,11 @@ class PlayPage extends StatefulWidget {
 }
 
 class _PlayPageState extends State<PlayPage> {
-  late VideoPlayerController _videoPlayerController;
+  VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
+  bool _isInitializing = false;
+  int _retryCount = 0;
+  static const int _maxRetries = 2;
 
   @override
   void initState() {
@@ -27,33 +30,68 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   Future<void> initializePlayer() async {
-    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-    await _videoPlayerController.initialize();
-    
-    _chewieController = ChewieController(
-      videoPlayerController: _videoPlayerController,
-      autoPlay: true,
-      looping: false,
-      aspectRatio: _videoPlayerController.value.aspectRatio,
-      materialProgressColors: ChewieProgressColors(
-        playedColor: Colors.white,
-        handleColor: Colors.white,
-        bufferedColor: Colors.white.withOpacity(0.3),
-        backgroundColor: Colors.white.withOpacity(0.1),
-      ),
-      cupertinoProgressColors: ChewieProgressColors(
-        playedColor: Colors.white,
-        handleColor: Colors.white,
-        bufferedColor: Colors.white.withOpacity(0.3),
-        backgroundColor: Colors.white.withOpacity(0.1),
-      ),
-    );
-    setState(() {});
+    if (_isInitializing && _retryCount == 0) return;
+    setState(() => _isInitializing = true);
+
+    try {
+      final oldPlayer = _videoPlayerController;
+      final oldChewie = _chewieController;
+      _videoPlayerController = null;
+      _chewieController = null;
+      
+      oldChewie?.dispose();
+      await oldPlayer?.dispose();
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(widget.videoUrl),
+        httpHeaders: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'Referer': widget.videoUrl.startsWith('http') ? Uri.parse(widget.videoUrl).origin : '',
+        },
+        formatHint: widget.videoUrl.toLowerCase().contains('.m3u8') ? VideoFormat.hls : null,
+      );
+      _videoPlayerController = controller;
+
+      await controller.initialize().timeout(const Duration(seconds: 15));
+      
+      _chewieController = ChewieController(
+        videoPlayerController: controller,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: controller.value.aspectRatio,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Colors.white,
+          handleColor: Colors.white,
+          bufferedColor: Colors.white.withOpacity(0.3),
+          backgroundColor: Colors.white.withOpacity(0.1),
+        ),
+        cupertinoProgressColors: ChewieProgressColors(
+          playedColor: Colors.white,
+          handleColor: Colors.white,
+          bufferedColor: Colors.white.withOpacity(0.3),
+          backgroundColor: Colors.white.withOpacity(0.1),
+        ),
+      );
+      _retryCount = 0;
+    } catch (e) {
+      debugPrint('PlayPage 初始化失败: $e');
+      if (mounted) {
+        if (_retryCount < _maxRetries) {
+          _retryCount++;
+          await Future.delayed(Duration(milliseconds: 800 * _retryCount));
+          return initializePlayer();
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('播放失败: $e'), backgroundColor: Colors.redAccent));
+      }
+    } finally {
+      if (mounted) setState(() => _isInitializing = false);
+    }
   }
 
   @override
   void dispose() {
-    _videoPlayerController.dispose();
+    _videoPlayerController?.dispose();
     _chewieController?.dispose();
     // 页面销毁时关闭唤醒锁，恢复系统默认设置
     WakelockPlus.disable();
@@ -69,7 +107,16 @@ class _PlayPageState extends State<PlayPage> {
           Center(
             child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
                 ? Chewie(controller: _chewieController!)
-                : const CircularProgressIndicator(color: Colors.white),
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(color: Colors.white),
+                      if (_retryCount > 0) ...[
+                        const SizedBox(height: 16),
+                        Text('正在尝试重试 ($_retryCount/$_maxRetries)...', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ]
+                    ],
+                  ),
           ),
           
           // Back button

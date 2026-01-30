@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/movie.dart';
 import '../models/site.dart';
 import '../services/cms_service.dart';
@@ -35,10 +36,13 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   bool _isSearching = true;
   bool _isOptimizing = false;
   bool _isInitializing = false;
+  int _retryCount = 0;
+  static const int _maxRetries = 2;
 
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _isPlaying = false;
+  bool _autoPlayNext = true;
 
   final Map<String, VideoQualityInfo> _qualityInfoMap = {};
   final Map<String, double> _scoreMap = {};
@@ -55,6 +59,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
+    WakelockPlus.enable();
   }
 
   void _loadData() async {
@@ -227,7 +232,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   }
 
   Future<void> _initializePlayer(String url, int index, {double? resumePosition, bool autoPlay = true, bool isAutoSwitch = false}) async {
-    if (_isInitializing) return;
+    if (_isInitializing && _retryCount == 0) return;
     _isInitializing = true;
 
     try {
@@ -246,14 +251,38 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
       if (!mounted) return;
 
-      final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      // 优化：添加 User-Agent 和 格式提示，解决 Apple 平台 OSStatus error -12847
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        httpHeaders: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'Referer': url.startsWith('http') ? Uri.parse(url).origin : '',
+        },
+        formatHint: url.toLowerCase().contains('.m3u8') ? VideoFormat.hls : null,
+      );
       _videoController = controller;
 
       controller.addListener(() {
-        if (!mounted || !controller.value.isInitialized) return;
+        if (!mounted) return;
+        
+        // 处理播放中出现的错误（参考 LunaTV 的 recoverMediaError 思路）
+        if (controller.value.hasError) {
+          final error = controller.value.errorDescription;
+          debugPrint('播放器运行时错误: $error');
+          
+          // 如果已经在播放了且出现错误，尝试原地重启一次
+          if (_isPlaying && _retryCount < _maxRetries) {
+            _retryCount++;
+            _initializePlayer(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true);
+            return;
+          }
+        }
+
+        if (!controller.value.isInitialized) return;
         if (controller.value.isPlaying && controller.value.position.inSeconds % 5 == 0) _savePlayRecord();
         if (controller.value.position >= controller.value.duration && controller.value.duration > Duration.zero && !controller.value.isPlaying) {
-          _playNextEpisode();
+          if (_autoPlayNext) _playNextEpisode();
         }
       });
 
@@ -265,10 +294,55 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
       if (mounted) {
         _createChewieController(autoPlay: autoPlay);
+        _retryCount = 0; // 初始化成功，重置重试计数
       }
     } catch (e) {
-      if (mounted && !isAutoSwitch) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('播放失败: $e'), backgroundColor: Colors.redAccent));
+      debugPrint('播放器初始化失败: $e');
+      
+      if (mounted) {
+        if (_retryCount < _maxRetries) {
+          // 1. 尝试原地重试
+          _retryCount++;
+          // 不在这里重置 _isInitializing，防止 UI 闪烁显示“播放失败”
+          debugPrint('尝试第 $_retryCount 次重试...');
+          await Future.delayed(Duration(milliseconds: 800 * _retryCount));
+          return _initializePlayer(url, index, resumePosition: resumePosition, autoPlay: autoPlay, isAutoSwitch: isAutoSwitch);
+        } else {
+          // 2. 重试耗尽，标记当前源为故障并尝试自动换源（Failover）
+          final key = '${_currentSource?.source}-${_currentSource?.id}';
+          _qualityInfoMap[key] = VideoQualityInfo.error();
+          
+          if (!isAutoSwitch) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('当前线路加载失败，正在尝试自动切换...'), 
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 2),
+              )
+            );
+          }
+
+          // 自动寻找下一个最佳源
+          final optimizer = ref.read(sourceOptimizerServiceProvider);
+          final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
+          
+          if (mounted && result.bestSource != _currentSource) {
+            _currentSource = result.bestSource;
+            _retryCount = 0;
+            _isInitializing = false;
+            return _initializePlayer(
+              _currentSource!.playGroups.first.urls[index], 
+              index, 
+              resumePosition: resumePosition, 
+              autoPlay: autoPlay, 
+              isAutoSwitch: true
+            );
+          } else {
+            if (!isAutoSwitch) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('播放失败: 所有可用线路均无法连接'), backgroundColor: Colors.redAccent));
+            }
+          }
+        }
       }
     } finally {
       _isInitializing = false;
@@ -335,6 +409,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     _tabController.dispose();
     _videoController?.dispose();
     _chewieController?.dispose();
+    WakelockPlus.disable();
     super.dispose();
   }
 
@@ -542,19 +617,110 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     if (_isSearching) return const Center(child: CircularProgressIndicator());
     if (_currentSource == null) return const Center(child: Text('暂无资源'));
     final group = _currentSource!.playGroups.first;
-    final isPC = MediaQuery.of(context).size.width > 800;
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isPC ? 4 : 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 2.2),
-      itemCount: group.urls.length,
-      itemBuilder: (context, i) {
-        final index = _descending ? (group.urls.length - 1 - i) : i;
-        final isCurrent = _currentEpisodeIndex == index && _isPlaying;
-        return GestureDetector(
-          onTap: () => _handlePlayAction(index),
-          child: AnimatedContainer(duration: const Duration(milliseconds: 200), decoration: BoxDecoration(color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)), alignment: Alignment.center, child: Text(group.titles[index], style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isCurrent ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) : theme.colorScheme.onSurface))),
-        );
-      },
+    
+    return Column(
+      children: [
+        // 操控栏：自动播放 & 排序
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 自动播放开关
+              GestureDetector(
+                onTap: () => setState(() => _autoPlayNext = !_autoPlayNext),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _autoPlayNext ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _autoPlayNext ? LucideIcons.playCircle : LucideIcons.stopCircle, 
+                          size: 14, 
+                          color: _autoPlayNext ? theme.colorScheme.primary : theme.colorScheme.secondary
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '自动连播: ${_autoPlayNext ? "开" : "关"}', 
+                          style: TextStyle(
+                            fontSize: 11, 
+                            fontWeight: FontWeight.bold,
+                            color: _autoPlayNext ? theme.colorScheme.primary : theme.colorScheme.secondary
+                          )
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // 排序切换
+              GestureDetector(
+                onTap: () => setState(() => _descending = !_descending),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.arrowUpDown, size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        _descending ? '倒序' : '正序', 
+                        style: TextStyle(
+                          fontSize: 12, 
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary
+                        )
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 16, indent: 16, endIndent: 16),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: List.generate(group.urls.length, (i) {
+                final index = _descending ? (group.urls.length - 1 - i) : i;
+                final isCurrent = _currentEpisodeIndex == index && _isPlaying;
+                final title = group.titles[index];
+                
+                return GestureDetector(
+                  onTap: () => _handlePlayAction(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    constraints: const BoxConstraints(minWidth: 60),
+                    decoration: BoxDecoration(
+                      color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12, 
+                        fontWeight: FontWeight.bold, 
+                        color: isCurrent ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) : theme.colorScheme.onSurface
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
