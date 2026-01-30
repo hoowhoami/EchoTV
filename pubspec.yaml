@@ -49,6 +49,7 @@ dependencies:
   window_manager: ^0.5.1
   url_launcher: ^6.3.2
   package_info_plus: ^9.0.0
+  wakelock_plus: ^1.4.0
 
 dev_dependencies:
   flutter_test:

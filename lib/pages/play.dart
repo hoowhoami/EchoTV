@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../widgets/zen_ui.dart';
 
 class PlayPage extends StatefulWidget {
@@ -21,6 +22,8 @@ class _PlayPageState extends State<PlayPage> {
   void initState() {
     super.initState();
     initializePlayer();
+    // 开启唤醒锁，防止播放时锁屏
+    WakelockPlus.enable();
   }
 
   Future<void> initializePlayer() async {
@@ -52,6 +55,8 @@ class _PlayPageState extends State<PlayPage> {
   void dispose() {
     _videoPlayerController.dispose();
     _chewieController?.dispose();
+    // 页面销毁时关闭唤醒锁，恢复系统默认设置
+    WakelockPlus.disable();
     super.dispose();
   }
 
