@@ -25,6 +25,8 @@ class VideoDetailPage extends ConsumerStatefulWidget {
   ConsumerState<VideoDetailPage> createState() => _VideoDetailPageState();
 }
 
+enum LoadingStage { searching, preferring, fetching, ready }
+
 class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTickerProviderStateMixin {
   DoubanSubject? _fullSubject;
   late TabController _tabController;
@@ -35,6 +37,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   bool _isSearching = true;
   bool _isOptimizing = false;
   bool _isInitializing = false;
+  LoadingStage _loadingStage = LoadingStage.searching;
+  String _loadingMessage = '🔍 正在搜索播放源...';
   int _retryCount = 0;
   static const int _maxRetries = 2;
 
@@ -66,6 +70,11 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     final cmsService = ref.read(cmsServiceProvider);
     final configService = ref.read(configServiceProvider);
 
+    setState(() {
+      _loadingStage = LoadingStage.searching;
+      _loadingMessage = '🔍 正在搜索播放源...';
+    });
+
     doubanService.getDetail(widget.subject.id).then((val) {
       if (mounted) setState(() => _fullSubject = val ?? widget.subject);
     });
@@ -90,25 +99,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         }
       }
 
-      // 搜索时的初始排序权重：蓝光、4K、1080P优先
-      filtered.sort((a, b) {
-        final keywords = ['4k', '1080', '蓝光', '高清'];
-        int aScore = 0, bScore = 0;
-        for (var k in keywords) {
-          if (a.sourceName.toLowerCase().contains(k)) aScore++;
-          if (b.sourceName.toLowerCase().contains(k)) bScore++;
-        }
-        if (aScore != bScore) return bScore.compareTo(aScore);
-        return b.playGroups.first.urls.length.compareTo(a.playGroups.first.urls.length);
-      });
-
       if (mounted) {
         setState(() {
           _availableSources = filtered;
-          if (_currentSource == null && filtered.isNotEmpty) {
-            _currentSource = filtered.first;
-            _isSearching = false;
-          }
         });
         
         // 核心改变：启动动态初始化监测
@@ -129,20 +122,16 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   /// 动态轮询初始化：等待最佳时机启动播放器
   Future<void> _startDynamicInitialization() async {
     int tick = 0;
-    const int maxTicks = 18; // 18 * 200ms = 3.6秒最大等待时间
+    const int maxTicks = 20; // 约 4 秒
 
     while (tick < maxTicks) {
       if (!mounted || _isPlaying || _isInitializing) return;
 
-      // 检查是否已经搜到了质量较好的源
       final bool hasHighQualitySource = _scoreMap.values.any((score) => score >= 90);
-      // 检查是否已经测了足够多的样本
-      final bool hasEnoughSamples = _testedSources.length >= 3;
-      // 检查搜索和优化是否已全部完成
-      final bool isAllTasksDone = !_isSearching && !_isOptimizing;
+      final bool hasEnoughSamples = _testedSources.length >= 3 || _testedSources.length == _availableSources.length;
+      final bool isSearchDone = !_isSearching;
 
-      // 如果满足任意条件，或者已经等了 1.5 秒且有了起码的样本，就启动
-      if (hasHighQualitySource || isAllTasksDone || (tick >= 7 && hasEnoughSamples)) {
+      if (hasHighQualitySource || (isSearchDone && hasEnoughSamples) || tick >= 15) {
         break;
       }
 
@@ -150,13 +139,30 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       tick++;
     }
 
-    if (mounted && _currentSource != null && !_isPlaying && !_isInitializing) {
-      _initializePlayer(
-        _currentSource!.playGroups.first.urls[0], 
-        0, 
-        autoPlay: false, 
-        isAutoSwitch: true
-      );
+    if (mounted && _availableSources.isNotEmpty && !_isPlaying && !_isInitializing) {
+      setState(() {
+        _loadingStage = LoadingStage.preferring;
+        _loadingMessage = '⚡ 正在优选最佳线路...';
+      });
+
+      final optimizer = ref.read(sourceOptimizerServiceProvider);
+      final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
+      
+      if (mounted) {
+        setState(() {
+          _currentSource = result.bestSource;
+          _qualityInfoMap.addAll(result.qualityInfoMap);
+          _scoreMap.addAll(result.scoreMap);
+          _loadingStage = LoadingStage.fetching;
+          _loadingMessage = '🎬 正在准备播放...';
+        });
+        
+        _initializePlayer(
+          _currentSource!.playGroups.first.urls[0], 
+          0, 
+          autoPlay: false, 
+        );
+      }
     }
   }
 
@@ -192,50 +198,24 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     }
 
     await Future.wait(List.generate(queue.length < maxConcurrent ? queue.length : maxConcurrent, (_) => worker()));
-    _checkAndApplyFinalSwitch();
+    if (mounted) setState(() => _isOptimizing = false);
   }
 
   void _applyIncrementalOptimization() async {
-    // 更加严格的保护：只要播放器实例已经存在，或者正在初始化，就不再进行增量纠偏
-    if (!mounted || _isInitializing || _videoController != null) return;
+    // 仅更新测速数据，不再自动更新 _currentSource
+    if (!mounted) return;
     final optimizer = ref.read(sourceOptimizerServiceProvider);
     final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
     
-    // 仅更新当前源引用，不立即初始化
-    if (mounted && _currentSource != result.bestSource && _videoController == null) {
-      setState(() => _currentSource = result.bestSource);
+    if (mounted) {
+      setState(() {
+        _qualityInfoMap.addAll(result.qualityInfoMap);
+        _scoreMap.addAll(result.scoreMap);
+      });
     }
   }
 
-  void _checkAndApplyFinalSwitch() async {
-    if (!mounted) return;
-    try {
-      final optimizer = ref.read(sourceOptimizerServiceProvider);
-      final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
-      if (mounted) {
-        // 核心优化：只要播放器 controller 已经创建，不管是否在播放（哪怕是暂停），都不再自动切换
-        final bool hasPlayer = _videoController != null;
-        final bool shouldAutoSwitch = _currentSource != result.bestSource && !hasPlayer && !_isInitializing;
-
-        setState(() {
-          _qualityInfoMap.addAll(result.qualityInfoMap);
-          _scoreMap.addAll(result.scoreMap);
-          _isOptimizing = false;
-          if (shouldAutoSwitch) {
-            debugPrint('优选结果：当前源非最佳且无播放实例，执行自动切换');
-            _currentSource = result.bestSource;
-            _initializePlayer(_currentSource!.playGroups.first.urls[_currentEpisodeIndex], _currentEpisodeIndex, autoPlay: false, isAutoSwitch: true);
-          } else if (_currentSource != result.bestSource && hasPlayer) {
-            debugPrint('优选结果：虽然有更好的源，但用户已开始使用当前源（暂停或播放中），放弃自动切换');
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isOptimizing = false);
-    }
-  }
-
-  Future<void> _initializePlayer(String url, int index, {double? resumePosition, bool autoPlay = true, bool isAutoSwitch = false}) async {
+  Future<void> _initializePlayer(String url, int index, {double? resumePosition, bool autoPlay = true}) async {
     // 如果正在初始化且不是重试请求，则忽略（防止并发初始化）
     if (_isInitializing && _retryCount == 0) return;
     
@@ -280,7 +260,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
             _retryCount++;
             _initializePlayer(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true);
           } else {
-            _handlePlaybackFailure(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true, isAutoSwitch: isAutoSwitch);
+            _handlePlaybackFailure(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true);
           }
           return;
         }
@@ -313,7 +293,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     } catch (e) {
       debugPrint('播放器初始化失败: $e');
       if (mounted) {
-        await _handlePlaybackFailure(url, index, resumePosition: resumePosition, autoPlay: autoPlay, isAutoSwitch: isAutoSwitch);
+        await _handlePlaybackFailure(url, index, resumePosition: resumePosition, autoPlay: autoPlay);
       }
     } finally {
       // 只有在没有触发下一次初始化/重试的情况下，才重置初始化状态
@@ -324,53 +304,61 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     }
   }
 
-  /// 统一处理播放失败及自动换源逻辑
-  Future<void> _handlePlaybackFailure(String url, int index, {double? resumePosition, bool autoPlay = true, bool isAutoSwitch = false}) async {
+  /// 统一处理播放失败：尝试重试或自动寻找下一个可用源
+  Future<void> _handlePlaybackFailure(String url, int index, {double? resumePosition, bool autoPlay = true}) async {
     if (!mounted) return;
 
     if (_retryCount < _maxRetries) {
-      // 1. 尝试原地重试
+      // 尝试原地重试
       _retryCount++;
       debugPrint('尝试第 $_retryCount 次重试...');
       await Future.delayed(Duration(milliseconds: 1000 * _retryCount));
-      return _initializePlayer(url, index, resumePosition: resumePosition, autoPlay: autoPlay, isAutoSwitch: isAutoSwitch);
+      return _initializePlayer(url, index, resumePosition: resumePosition, autoPlay: autoPlay);
     } else {
-      // 2. 重试耗尽，标记当前源为故障并尝试自动换源
+      // 重试耗尽，标记当前源为故障并尝试静默寻找下一个最佳源
       final key = '${_currentSource?.source}-${_currentSource?.id}';
       _qualityInfoMap[key] = VideoQualityInfo.error();
       _scoreMap[key] = -1.0; // 降低权重
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('当前线路 [${_currentSource?.sourceName}] 播放失败，正在尝试自动切换...'), 
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
-          )
-        );
-      }
-
       // 自动寻找下一个最佳源
       final optimizer = ref.read(sourceOptimizerServiceProvider);
       final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
       
-      if (mounted && result.bestSource != _currentSource) {
-        debugPrint('自动切换到备用源: ${result.bestSource.sourceName}');
+      if (mounted && result.bestSource != _currentSource && !(_qualityInfoMap['${result.bestSource.source}-${result.bestSource.id}']?.hasError ?? false)) {
+        debugPrint('当前源 [${_currentSource?.sourceName}] 无法播放，静默尝试下一线路: ${result.bestSource.sourceName}');
         _currentSource = result.bestSource;
         _retryCount = 0; // 换源后重置计数
-        _isPlaying = false;
         _isInitializing = false;
+        
+        if (!_isPlaying) {
+          setState(() {
+            _loadingStage = LoadingStage.fetching;
+            _loadingMessage = '🔄 正在尝试切换至备用线路...';
+          });
+        }
+
         return _initializePlayer(
           _currentSource!.playGroups.first.urls[index], 
           index, 
           resumePosition: resumePosition, 
-          autoPlay: autoPlay, 
-          isAutoSwitch: true
+          autoPlay: autoPlay
         );
       } else {
+        // 没有找到更好的源或所有源都试过了
         if (mounted) {
+          // 如果还在搜索中，先不急着报“无资源”，可能后续会有新源
+          if (_isSearching) {
+            debugPrint('当前所有已知源均失效，但搜索仍在进行，继续等待新资源...');
+            setState(() {
+              _isInitializing = false;
+              _isPlaying = false;
+              _loadingMessage = '⏳ 正在等待更多资源上线...';
+            });
+            return;
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('播放失败: 所有可用线路均无法连接'), backgroundColor: Colors.redAccent)
+            const SnackBar(content: Text('播放失败: 暂无可用资源，请尝试切换其他影片'), backgroundColor: Colors.redAccent)
           );
           setState(() {
             _isInitializing = false;
@@ -571,8 +559,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                           const CircularProgressIndicator(color: Colors.white),
                           const SizedBox(height: 16),
                           Text(
-                            _isSearching ? '正在搜索资源...' : (_isOptimizing ? '正在优选最佳线路...' : '正在准备播放...'),
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            _loadingMessage,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
