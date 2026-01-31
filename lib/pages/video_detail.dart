@@ -34,6 +34,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   List<VideoDetail> _availableSources = [];
   VideoDetail? _currentSource;
   int _currentEpisodeIndex = 0;
+  double? _initialResumePosition;
   bool _isSearching = true;
   bool _isOptimizing = false;
   bool _isInitializing = false;
@@ -61,8 +62,39 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadData();
+    _checkHistoryAndLoadData();
     WakelockPlus.enable();
+  }
+
+  void _checkHistoryAndLoadData() async {
+    // 1. 尝试从历史记录中恢复状态
+    final history = ref.read(historyProvider).value ?? [];
+    final record = history.firstWhere(
+      (r) => r.searchTitle == widget.subject.title,
+      orElse: () => PlayRecord(
+        title: '', 
+        sourceName: '', 
+        cover: '', 
+        year: '', 
+        index: 0, 
+        totalEpisodes: 0, 
+        playTime: 0, 
+        totalTime: 0, 
+        saveTime: 0, 
+        searchTitle: ''
+      ),
+    );
+
+    if (record.title.isNotEmpty) {
+      debugPrint('找到历史记录：第 ${record.index} 集，进度 ${record.playTime}s');
+      setState(() {
+        _currentEpisodeIndex = record.index;
+        _initialResumePosition = record.playTime.toDouble();
+      });
+    }
+
+    // 2. 正常加载数据
+    _loadData();
   }
 
   void _loadData() async {
@@ -158,10 +190,13 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         });
         
         _initializePlayer(
-          _currentSource!.playGroups.first.urls[0], 
-          0, 
+          _currentSource!.playGroups.first.urls[_currentEpisodeIndex], 
+          _currentEpisodeIndex, 
+          resumePosition: _initialResumePosition,
           autoPlay: false, 
         );
+        // 使用后清空初始进度，防止干扰手动切换
+        _initialResumePosition = null;
       }
     }
   }
@@ -288,7 +323,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       if (mounted && _videoController == controller) {
         _createChewieController(autoPlay: autoPlay);
         _isInitializing = false; // 初始化成功
-        setState(() {});
+        setState(() {
+          _currentEpisodeIndex = index;
+        });
       }
     } catch (e) {
       debugPrint('播放器初始化失败: $e');
@@ -413,10 +450,14 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   void _handlePlayAction(int index, {double? resumePosition}) {
     if (_currentSource == null) return;
+    // 手动操作，清除初始恢复进度
+    _initialResumePosition = null;
     _initializePlayer(_currentSource!.playGroups.first.urls[index], index, resumePosition: resumePosition, autoPlay: true);
   }
 
   Future<void> _switchSource(VideoDetail newSource) async {
+    // 手动操作，清除初始恢复进度
+    _initialResumePosition = null;
     final oldPlayPosition = _videoController?.value.position.inSeconds.toDouble() ?? 0.0;
     setState(() => _currentSource = newSource);
     final targetIndex = _currentEpisodeIndex >= newSource.playGroups.first.urls.length ? 0 : _currentEpisodeIndex;
