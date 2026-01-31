@@ -1,4 +1,4 @@
-package com.example.echotv
+package com.hoowhoami.echotv
 
 import io.flutter.embedding.android.FlutterActivity
 

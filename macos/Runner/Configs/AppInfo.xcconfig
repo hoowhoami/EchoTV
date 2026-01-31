@@ -8,7 +8,7 @@
 PRODUCT_NAME = echotv
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.echotv
+PRODUCT_BUNDLE_IDENTIFIER = com.hoowhoami.echotv
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.hoowhoami. All rights reserved.
