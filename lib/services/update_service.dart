@@ -99,13 +99,19 @@ class UpdateService {
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             borderRadius: 12,
-            onPressed: () async {
-              final url = Uri.parse(releaseUrl);
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: const Text('立即前往下载', style: TextStyle(fontSize: 13)),
+                        onPressed: () async {
+                          final url = Uri.parse(releaseUrl);
+                          try {
+                            final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+                            if (!launched && context.mounted) {
+                              _showSnackBar(context, '无法打开下载链接，请手动前往浏览器访问');
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              _showSnackBar(context, '无法打开下载链接: $e');
+                            }
+                          }
+                        },            child: const Text('立即前往下载', style: TextStyle(fontSize: 13)),
           ),
         ],
       ),
