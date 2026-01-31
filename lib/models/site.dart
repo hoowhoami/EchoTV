@@ -102,6 +102,30 @@ class PlayRecord {
   factory PlayRecord.fromJson(Map<String, dynamic> json) => PlayRecord(title: json['title'] ?? '', sourceName: json['source_name'] ?? '', cover: json['cover'] ?? '', year: json['year'] ?? '', index: json['index'] ?? 0, totalEpisodes: json['total_episodes'] ?? 0, playTime: json['play_time'] ?? 0, totalTime: json['total_time'] ?? 0, saveTime: json['save_time'] ?? 0, searchTitle: json['search_title'] ?? '');
 }
 
+class SkipConfig {
+  final bool enable;
+  final int introTime;
+  final int outroTime;
+
+  const SkipConfig({
+    this.enable = false,
+    this.introTime = 0,
+    this.outroTime = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'enable': enable,
+    'intro_time': introTime,
+    'outro_time': outroTime,
+  };
+
+  factory SkipConfig.fromJson(Map<String, dynamic> json) => SkipConfig(
+    enable: json['enable'] ?? false,
+    introTime: json['intro_time'] ?? 0,
+    outroTime: json['outro_time'] ?? 0,
+  );
+}
+
 class Favorite {
   final String title;
   final String sourceName;

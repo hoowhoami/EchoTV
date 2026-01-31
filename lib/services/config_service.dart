@@ -28,6 +28,7 @@ class ConfigService {
   static const String keyAnnouncement = 'announcement';
   static const String keyFavorites = 'favorites';
   static const String keyHistory = 'play_history';
+  static const String keySkipConfigs = 'skip_configs';
   static const String keyHasAgreedTerms = 'has_agreed_terms';
 
   Future<bool> getHasAgreedTerms() async {
@@ -285,6 +286,32 @@ class ConfigService {
     final prefs = await SharedPreferences.getInstance();
     final data = history.map((s) => jsonEncode(s.toJson())).toList();
     await prefs.setStringList(keyHistory, data);
+  }
+
+  Future<Map<String, SkipConfig>> getSkipConfigs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(keySkipConfigs);
+    if (data == null) return <String, SkipConfig>{};
+    try {
+      final Map<String, dynamic> jsonData = jsonDecode(data);
+      final Map<String, SkipConfig> result = {};
+      jsonData.forEach((key, value) {
+        if (value != null) {
+          result[key] = SkipConfig.fromJson(value as Map<String, dynamic>);
+        }
+      });
+      return result;
+    } catch (e) {
+      debugPrint('Error loading skip configs: $e');
+      return <String, SkipConfig>{};
+    }
+  }
+
+  Future<void> saveSkipConfig(String key, SkipConfig config) async {
+    final configs = await getSkipConfigs();
+    configs[key] = config;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keySkipConfigs, jsonEncode(configs.map((key, value) => MapEntry(key, value.toJson()))));
   }
 
   Future<String> exportAll() async {

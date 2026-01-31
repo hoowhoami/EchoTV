@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import '../models/site.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/video_controls.dart';
 
 class PlayPage extends StatefulWidget {
   final String videoUrl;
@@ -18,8 +20,6 @@ class _PlayPageState extends State<PlayPage> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isInitializing = false;
-  int _retryCount = 0;
-  static const int _maxRetries = 2;
 
   @override
   void initState() {
@@ -30,7 +30,7 @@ class _PlayPageState extends State<PlayPage> {
   }
 
   Future<void> initializePlayer() async {
-    if (_isInitializing && _retryCount == 0) return;
+    if (_isInitializing) return;
     setState(() => _isInitializing = true);
 
     try {
@@ -53,13 +53,16 @@ class _PlayPageState extends State<PlayPage> {
       );
       _videoPlayerController = controller;
 
-      await controller.initialize().timeout(const Duration(seconds: 15));
+      await controller.initialize().timeout(const Duration(seconds: 30));
       
       _chewieController = ChewieController(
         videoPlayerController: controller,
         autoPlay: true,
         looping: false,
         aspectRatio: controller.value.aspectRatio,
+        customControls: ZenVideoControls(
+          skipConfig: SkipConfig(), // 直播/单视频默认不跳过
+        ),
         materialProgressColors: ChewieProgressColors(
           playedColor: Colors.white,
           handleColor: Colors.white,
@@ -73,15 +76,9 @@ class _PlayPageState extends State<PlayPage> {
           backgroundColor: Colors.white.withOpacity(0.1),
         ),
       );
-      _retryCount = 0;
     } catch (e) {
       debugPrint('PlayPage 初始化失败: $e');
       if (mounted) {
-        if (_retryCount < _maxRetries) {
-          _retryCount++;
-          await Future.delayed(Duration(milliseconds: 800 * _retryCount));
-          return initializePlayer();
-        }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('播放失败: $e'), backgroundColor: Colors.redAccent));
       }
     } finally {
@@ -107,14 +104,10 @@ class _PlayPageState extends State<PlayPage> {
           Center(
             child: _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
                 ? Chewie(controller: _chewieController!)
-                : Column(
+                : const Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(color: Colors.white),
-                      if (_retryCount > 0) ...[
-                        const SizedBox(height: 16),
-                        Text('正在尝试重试 ($_retryCount/$_maxRetries)...', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      ]
+                      CircularProgressIndicator(color: Colors.white),
                     ],
                   ),
           ),
