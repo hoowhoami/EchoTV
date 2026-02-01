@@ -623,15 +623,19 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused) {
+      // 切到后台：仅暂停并强制保存一次进度，不销毁实例
       _videoController?.pause();
+      _savePlayRecord();
+    } else if (state == AppLifecycleState.detached) {
+      // 彻底断开（如热重启）：销毁所有资源
       _videoController?.dispose();
       _videoController = null;
       _chewieController?.dispose();
       _chewieController = null;
       _isPlaying = false;
-      if (mounted) setState(() {});
     }
+    if (mounted) setState(() {});
   }
 
   @override

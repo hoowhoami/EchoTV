@@ -100,14 +100,17 @@ class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused) {
+      // 切到后台：仅暂停，保留实例以实现快速切回
       _videoPlayerController?.pause();
+    } else if (state == AppLifecycleState.detached) {
+      // 销毁
       _videoPlayerController?.dispose();
       _videoPlayerController = null;
       _chewieController?.dispose();
       _chewieController = null;
-      if (mounted) setState(() {});
     }
+    if (mounted) setState(() {});
   }
 
   @override
