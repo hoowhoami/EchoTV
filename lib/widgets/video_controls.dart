@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -34,10 +35,15 @@ class ZenVideoControls extends StatefulWidget {
 class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener {
   VideoPlayerValue? _latestValue;
   Timer? _hideTimer;
+  Timer? _hintTimer;
   bool _displayToggles = false;
   bool _showSettings = false;
   bool _showSpeedSubMenu = false;
   bool _isBarHovered = false;
+  bool _isLocked = false;
+  bool _showHint = false;
+  String _hintText = '';
+  IconData _hintIcon = LucideIcons.play;
   final double _barHeight = 36.0;
   
   late SkipConfig _localSkipConfig;
@@ -79,6 +85,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   void dispose() {
     _videoPlayerController?.removeListener(_updateState);
     _hideTimer?.cancel();
+    _hintTimer?.cancel();
     windowManager.removeListener(this);
     super.dispose();
   }
@@ -116,48 +123,148 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     });
   }
 
+  void _showActionHint(String text, IconData icon) {
+    _hintTimer?.cancel();
+    setState(() {
+      _hintText = text;
+      _hintIcon = icon;
+      _showHint = true;
+    });
+    _hintTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _showHint = false);
+    });
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent || _videoPlayerController == null) return;
+    
+    final key = event.logicalKey;
+    if (_isLocked && key != LogicalKeyboardKey.keyL) return;
+
+    if (key == LogicalKeyboardKey.space) {
+      if (_videoPlayerController!.value.isPlaying) {
+        _videoPlayerController!.pause();
+        _showActionHint('已暂停', LucideIcons.pause);
+      } else {
+        _videoPlayerController!.play();
+        _showActionHint('已播放', LucideIcons.play);
+      }
+      _cancelAndRestartTimer();
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
+      final newPos = _videoPlayerController!.value.position - const Duration(seconds: 10);
+      _videoPlayerController!.seekTo(newPos < Duration.zero ? Duration.zero : newPos);
+      _showActionHint('-10s', LucideIcons.rewind);
+      _cancelAndRestartTimer();
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      final newPos = _videoPlayerController!.value.position + const Duration(seconds: 10);
+      _videoPlayerController!.seekTo(newPos);
+      _showActionHint('+10s', LucideIcons.fastForward);
+      _cancelAndRestartTimer();
+    } else if (key == LogicalKeyboardKey.keyL) {
+      setState(() => _isLocked = !_isLocked);
+      _showActionHint(_isLocked ? '已上锁' : '已解锁', _isLocked ? LucideIcons.lock : LucideIcons.unlock);
+      _cancelAndRestartTimer();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_latestValue?.hasError ?? false) {
       return const Center(child: Icon(LucideIcons.alertCircle, color: Colors.white, size: 32));
     }
 
-    return MouseRegion(
-      onHover: (_) => _cancelAndRestartTimer(),
-      child: GestureDetector(
-        onTap: () {
-          if (_showSettings) {
-            setState(() {
-              _showSettings = false;
-              _showSpeedSubMenu = false;
-              _startHideTimer();
-            });
-          } else if (_displayToggles) {
-            setState(() => _displayToggles = false);
-          } else {
-            _cancelAndRestartTimer();
-          }
-        },
-        child: AbsorbPointer(
-          absorbing: !_displayToggles && !_showSettings,
-          child: Stack(
-            children: [
-              if (_latestValue == null || !_latestValue!.isInitialized || _latestValue!.isBuffering)
-                const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
-              
-              _buildHitArea(),
-              
-              if (_showSettings) _buildSettingsOverlay(),
+    return KeyboardListener(
+      focusNode: FocusNode()..requestFocus(),
+      onKeyEvent: _handleKeyEvent,
+      child: MouseRegion(
+        onHover: (_) => _cancelAndRestartTimer(),
+        child: GestureDetector(
+          onTap: () {
+            if (_isLocked) {
+              _cancelAndRestartTimer();
+              return;
+            }
+            if (_showSettings) {
+              setState(() {
+                _showSettings = false;
+                _showSpeedSubMenu = false;
+                _startHideTimer();
+              });
+            } else if (_displayToggles) {
+              setState(() => _displayToggles = false);
+            } else {
+              _cancelAndRestartTimer();
+            }
+          },
+          child: AbsorbPointer(
+            absorbing: !_displayToggles && !_showSettings,
+            child: Stack(
+              children: [
+                if (_latestValue == null || !_latestValue!.isInitialized || _latestValue!.isBuffering)
+                  const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                
+                _buildHitArea(),
 
-              if (!_showSettings)
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    _buildTopBar(context),
-                    _buildBottomBar(context),
-                  ],
-                ),
-            ],
+                // 中央提示
+                if (_showHint)
+                  Center(
+                    child: AnimatedOpacity(
+                      opacity: _showHint ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_hintIcon, color: Colors.white, size: 32),
+                            const SizedBox(height: 8),
+                            Text(_hintText, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                if (_showSettings && !_isLocked) _buildSettingsOverlay(),
+
+                if (!_showSettings) ...[
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: <Widget>[
+                      _buildTopBar(context),
+                      _buildBottomBar(context),
+                    ],
+                  ),
+                  _buildLockButton(),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockButton() {
+    return AnimatedOpacity(
+      opacity: _displayToggles ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 24),
+          child: _buildIconBtn(
+            _isLocked ? LucideIcons.lock : LucideIcons.unlock,
+            () {
+              setState(() => _isLocked = !_isLocked);
+              _showActionHint(_isLocked ? '已上锁' : '已解锁', _isLocked ? LucideIcons.lock : LucideIcons.unlock);
+              _cancelAndRestartTimer();
+            },
+            size: 26,
           ),
         ),
       ),
@@ -364,15 +471,13 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                   Navigator.of(context).maybePop();
                 }
               },
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white24, width: 1),
-                ),
-                child: const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 24),
-              ),
+              child: _buildIconBtn(LucideIcons.chevronLeft, () {
+                if (_chewieController?.isFullScreen ?? false) {
+                  _chewieController?.exitFullScreen();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              }, size: 28),
             ),
           ],
         ),
@@ -400,53 +505,55 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
             const SizedBox(height: 8),
             Row(
               children: [
-                if (_videoPlayerController != null) _buildPlayPause(_videoPlayerController!),
-                if (widget.hasNextEpisode && widget.onNextEpisode != null)
-                  _buildIconBtn(LucideIcons.stepForward, widget.onNextEpisode!),
-                if (_videoPlayerController != null) _buildVolumeButton(context),
-                const SizedBox(width: 8),
-                _buildPosition(context),
-                
-                const Spacer(),
-                
-                // 右侧组合：[设置] [应用全屏] [桌面全屏]
-                _buildIconBtn(LucideIcons.settings, () {
-                  setState(() {
-                    _showSettings = true;
-                    _displayToggles = true;
-                  });
-                }),
+                if (!_isLocked) ...[
+                  if (_videoPlayerController != null) _buildPlayPause(_videoPlayerController!),
+                  if (widget.hasNextEpisode && widget.onNextEpisode != null)
+                    _buildIconBtn(LucideIcons.stepForward, widget.onNextEpisode!),
+                  if (_videoPlayerController != null) _buildVolumeButton(context),
+                  const SizedBox(width: 8),
+                  _buildPosition(context),
+                  
+                  const Spacer(),
+                  
+                  // 右侧组合：[设置] [应用全屏] [桌面全屏]
+                  _buildIconBtn(LucideIcons.settings, () {
+                    setState(() {
+                      _showSettings = true;
+                      _displayToggles = true;
+                    });
+                  }),
 
-                _buildIconBtn(LucideIcons.expand, () {
-                  if (_chewieController?.isFullScreen ?? false) {
-                    _chewieController?.exitFullScreen();
-                    if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
-                      Future.delayed(const Duration(milliseconds: 100), () {
-                        if (context.mounted && Navigator.of(context).canPop()) {
-                          Navigator.of(context).maybePop();
-                        }
-                      });
-                    }
-                  } else {
-                    _chewieController?.enterFullScreen();
-                  }
-                }),
-
-                if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux))
-                  _buildIconBtn(LucideIcons.maximize, () async {
-                    bool isFullScreen = await windowManager.isFullScreen();
-                    if (!isFullScreen) {
-                      if (!(_chewieController?.isFullScreen ?? false)) {
-                        _chewieController?.enterFullScreen();
+                  _buildIconBtn(LucideIcons.expand, () {
+                    if (_chewieController?.isFullScreen ?? false) {
+                      _chewieController?.exitFullScreen();
+                      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          if (context.mounted && Navigator.of(context).canPop()) {
+                            Navigator.of(context).maybePop();
+                          }
+                        });
                       }
-                      await windowManager.setFullScreen(true);
                     } else {
-                      await windowManager.setFullScreen(false);
-                      if (_chewieController?.isFullScreen ?? false) {
-                        _chewieController?.exitFullScreen();
-                      }
+                      _chewieController?.enterFullScreen();
                     }
                   }),
+
+                  if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux))
+                    _buildIconBtn(LucideIcons.maximize, () async {
+                      bool isFullScreen = await windowManager.isFullScreen();
+                      if (!isFullScreen) {
+                        if (!(_chewieController?.isFullScreen ?? false)) {
+                          _chewieController?.enterFullScreen();
+                        }
+                        await windowManager.setFullScreen(true);
+                      } else {
+                        await windowManager.setFullScreen(false);
+                        if (_chewieController?.isFullScreen ?? false) {
+                          _chewieController?.exitFullScreen();
+                        }
+                      }
+                    }),
+                ],
               ],
             ),
           ],
@@ -555,11 +662,11 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
               _videoPlayerController!.value.duration.inMilliseconds.toDouble()
             ),
             max: _videoPlayerController!.value.duration.inMilliseconds.toDouble(),
-            onChanged: (value) {
+            onChanged: _isLocked ? null : (value) {
               _videoPlayerController!.seekTo(Duration(milliseconds: value.toInt()));
             },
-            onChangeStart: (_) => _hideTimer?.cancel(),
-            onChangeEnd: (_) => _cancelAndRestartTimer(),
+            onChangeStart: _isLocked ? null : (_) => _hideTimer?.cancel(),
+            onChangeEnd: _isLocked ? null : (_) => _cancelAndRestartTimer(),
           ),
         ),
       ),

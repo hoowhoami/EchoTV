@@ -646,68 +646,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     final horizontalPadding = isPC ? 48.0 : 24.0;
 
     return ZenScaffold(
-      body: Focus(
-        autofocus: true,
-        onKeyEvent: (node, event) {
-          if (event is! KeyDownEvent) return KeyEventResult.ignored;
-          
-          final key = event.logicalKey;
-          final isAltPressed = HardwareKeyboard.instance.isAltPressed;
-
-          if (key == LogicalKeyboardKey.space) {
-            if (_videoController != null) {
-              _videoController!.value.isPlaying ? _videoController!.pause() : _videoController!.play();
-              return KeyEventResult.handled;
-            }
-          } else if (key == LogicalKeyboardKey.arrowLeft) {
-            if (isAltPressed) {
-               _playPreviousEpisode();
-               return KeyEventResult.handled;
-            }
-            if (_videoController != null) {
-              final newPos = _videoController!.value.position - const Duration(seconds: 10);
-              _videoController!.seekTo(newPos < Duration.zero ? Duration.zero : newPos);
-              return KeyEventResult.handled;
-            }
-          } else if (key == LogicalKeyboardKey.arrowRight) {
-            if (isAltPressed) {
-               _playNextEpisode();
-               return KeyEventResult.handled;
-            }
-            if (_videoController != null) {
-              final newPos = _videoController!.value.position + const Duration(seconds: 10);
-              _videoController!.seekTo(newPos);
-              return KeyEventResult.handled;
-            }
-          } else if (key == LogicalKeyboardKey.keyF) {
-            if (_chewieController != null) {
-              _chewieController!.toggleFullScreen();
-              return KeyEventResult.handled;
-            }
-          } else if (key == LogicalKeyboardKey.arrowUp) {
-            if (_videoController != null) {
-              final newVol = (_videoController!.value.volume + 0.1).clamp(0.0, 1.0);
-              _videoController!.setVolume(newVol);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('音量: ${(newVol * 100).toInt()}%'), duration: const Duration(milliseconds: 500), behavior: SnackBarBehavior.floating),
-              );
-              return KeyEventResult.handled;
-            }
-          } else if (key == LogicalKeyboardKey.arrowDown) {
-            if (_videoController != null) {
-              final newVol = (_videoController!.value.volume - 0.1).clamp(0.0, 1.0);
-              _videoController!.setVolume(newVol);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('音量: ${(newVol * 100).toInt()}%'), duration: const Duration(milliseconds: 500), behavior: SnackBarBehavior.floating),
-              );
-              return KeyEventResult.handled;
-            }
-          }
-          
-          return KeyEventResult.ignored;
-        },
-        child: Stack(
-          children: [
+      body: Stack(
+        children: [
           Positioned.fill(child: Opacity(opacity: 0.1, child: CoverImage(imageUrl: widget.subject.cover))),
           Positioned.fill(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80), child: Container(color: Colors.transparent))),
           CustomScrollView(
@@ -746,7 +686,6 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           ),
         ],
       ),
-    ),
     );
   }
 
