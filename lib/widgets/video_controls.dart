@@ -148,9 +148,8 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
               if (!_showSettings)
                 Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: <Widget>[
-                    _buildTopBar(context),
                     _buildBottomBar(context),
                   ],
                 ),
@@ -318,29 +317,6 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       dense: true,
       visualDensity: VisualDensity.compact,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    );
-  }
-
-  Widget _buildTopBar(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: _displayToggles ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 300),
-      child: Container(
-        height: _barHeight + 10,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.3), Colors.transparent],
-          ),
-        ),
-        child: Row(
-          children: [
-            _buildIconBtn(LucideIcons.chevronLeft, () => Navigator.of(context).pop()),
-          ],
-        ),
-      ),
     );
   }
 

@@ -30,7 +30,7 @@ class VideoDetailPage extends ConsumerStatefulWidget {
 
 enum LoadingStage { searching, preferring, fetching, ready }
 
-class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTickerProviderStateMixin {
+class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   DoubanSubject? _fullSubject;
   late TabController _tabController;
 
@@ -66,6 +66,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this);
     _loadSettings();
     _checkHistoryAndLoadData();
@@ -224,7 +225,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           _currentSource!.playGroups.first.urls[_currentEpisodeIndex], 
           _currentEpisodeIndex, 
           resumePosition: _initialResumePosition,
-          autoPlay: false, 
+          autoPlay: true, 
         );
         // 使用后清空初始进度，防止干扰手动切换
         _initialResumePosition = null;
@@ -367,6 +368,12 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           if (!controller.value.isInitialized) return;
 
           
+
+          if (mounted && _isPlaying != controller.value.isPlaying) {
+            setState(() {
+              _isPlaying = controller.value.isPlaying;
+            });
+          }
 
           if (controller.value.isPlaying && controller.value.position.inSeconds % 5 == 0) _savePlayRecord();
 
@@ -547,7 +554,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         handleColor: Theme.of(context).primaryColor,
       ),
     );
-    _isPlaying = true;
+    _isPlaying = autoPlay;
     if (autoPlay) _savePlayRecord();
   }
 
@@ -605,11 +612,25 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     _videoController?.dispose();
     _chewieController?.dispose();
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _videoController?.pause();
+      _videoController?.dispose();
+      _videoController = null;
+      _chewieController?.dispose();
+      _chewieController = null;
+      _isPlaying = false;
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -690,16 +711,16 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
               SliverAppBar(
                 backgroundColor: Colors.transparent,
                 floating: true,
-                automaticallyImplyLeading: false,
-                leading: Center(
-                  child: ClipOval(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.1),
-                        child: IconButton(icon: const Icon(LucideIcons.chevronLeft, size: 20), onPressed: () => Navigator.pop(context)),
-                      ),
-                    ),
+                pinned: false,
+                leading: IconButton(
+                  icon: const Icon(LucideIcons.chevronLeft, size: 24),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: Text(
+                  widget.subject.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -952,7 +973,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
               runSpacing: 10,
               children: List.generate(group.urls.length, (i) {
                 final index = _descending ? (group.urls.length - 1 - i) : i;
-                final isCurrent = _currentEpisodeIndex == index && _isPlaying;
+                final isCurrent = _currentEpisodeIndex == index && (_chewieController != null || _isInitializing);
                 final title = group.titles[index];
                 
                 return GestureDetector(

@@ -16,7 +16,7 @@ class PlayPage extends StatefulWidget {
   State<PlayPage> createState() => _PlayPageState();
 }
 
-class _PlayPageState extends State<PlayPage> {
+class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isInitializing = false;
@@ -24,6 +24,7 @@ class _PlayPageState extends State<PlayPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     initializePlayer();
     // 开启唤醒锁，防止播放时锁屏
     WakelockPlus.enable();
@@ -88,11 +89,24 @@ class _PlayPageState extends State<PlayPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _videoPlayerController?.dispose();
     _chewieController?.dispose();
     // 页面销毁时关闭唤醒锁，恢复系统默认设置
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _videoPlayerController?.pause();
+      _videoPlayerController?.dispose();
+      _videoPlayerController = null;
+      _chewieController?.dispose();
+      _chewieController = null;
+      if (mounted) setState(() {});
+    }
   }
 
   @override
