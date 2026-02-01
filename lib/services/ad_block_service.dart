@@ -111,43 +111,123 @@ class AdBlockService {
   }
 
   String _filterAds(String content, Uri baseUri) {
-    // 关键修复：处理所有标签内的 URI 属性（如加密 Key 和初始化分片）
-    // 如果不处理这些，播放器会去 localhost 根目录请求它们，导致 404
     content = content.replaceAllMapped(RegExp(r'URI="([^"]+)"'), (match) {
       final uri = match.group(1)!;
       return 'URI="${_getAbsoluteUrl(uri, baseUri)}"';
     });
 
     final lines = content.split('\n');
+    final adKeywords = [
+      'ads', 'union', 'click', 'p6p', 'pop', 'short.mp4', 'advert', 'adv.', 
+      'guanggao', 'miaopai', '666216.com', 'v.it608.com', 'ovscic'
+    ];
+    
+    // --- 第一遍扫描：自动探测正片所在的 CDN 域名 ---
+    final Map<String, int> hostCounts = {};
+    for (var line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isNotEmpty && !trimmed.startsWith('#')) {
+        try {
+          final uri = Uri.parse(_getAbsoluteUrl(trimmed, baseUri));
+          hostCounts[uri.host] = (hostCounts[uri.host] ?? 0) + 1;
+        } catch (e) {}
+      }
+    }
+    
+    // 找出出现次数超过 5% 的域名中，出现次数最多的那个作为“正片域名”
+    String? mainVideoHost;
+    int maxCount = 0;
+    hostCounts.forEach((host, count) {
+      if (count > maxCount) {
+        maxCount = count;
+        mainVideoHost = host;
+      }
+    });
+
+    // --- 第二遍扫描：执行过滤 ---
     final result = <String>[];
+    int segmentCount = 0;
+    bool lastWasRemoved = false;
+    
     for (int i = 0; i < lines.length; i++) {
       String line = lines[i].trim();
       if (line.isEmpty) continue;
 
       if (line.startsWith('#EXTINF:')) {
+        segmentCount++;
         final durationMatch = RegExp(r'#EXTINF:(\d+(\.\d+)?)').firstMatch(line);
-        if (durationMatch != null) {
-          final duration = double.tryParse(durationMatch.group(1) ?? '0') ?? 0;
-          if (duration < 5.0 && result.length < 20) {
-             if (i + 1 < lines.length && !lines[i+1].startsWith('#')) {
-                final nextLine = lines[i+1].trim();
-                if (nextLine.contains('ads') || nextLine.contains('union') || nextLine.contains('.mp4')) {
-                  debugPrint('🚫 AdBlock: Skipped ad segment (${duration}s): $nextLine');
-                  i++; 
-                  continue;
-                }
-             }
+        final duration = double.tryParse(durationMatch?.group(1) ?? '0') ?? 0;
+
+        int urlIndex = i + 1;
+        while (urlIndex < lines.length && lines[urlIndex].trim().startsWith('#')) {
+          urlIndex++;
+        }
+
+        if (urlIndex < lines.length) {
+          final rawUrl = lines[urlIndex].trim();
+          final absoluteUrl = _getAbsoluteUrl(rawUrl, baseUri);
+          final segmentUri = Uri.parse(absoluteUrl);
+
+          bool isAd = false;
+
+          // 判定逻辑 A: 显式黑名单 (最高优先级)
+          if (adKeywords.any((kw) => absoluteUrl.toLowerCase().contains(kw))) {
+            isAd = true;
           }
+          
+          // 判定逻辑 B: 域名/时长组合特征
+          // 如果域名既不是主站也不是正片存储站，且时长较短，则判定为广告
+          if (segmentUri.host != mainVideoHost && segmentUri.host != baseUri.host && duration < 8.0) {
+            isAd = true;
+          }
+
+          // 判定逻辑 C: 采集站典型的 Pre-roll 广告 (前 3 片且域名偏移)
+          if (segmentCount <= 3 && duration < 4.5 && segmentUri.host != mainVideoHost) {
+            isAd = true;
+          }
+
+          if (isAd) {
+            debugPrint('🚫 AdBlock: Filtered ad segment (${duration}s) -> $absoluteUrl');
+            lastWasRemoved = true;
+            i = urlIndex;
+            continue;
+          }
+          
+          result.add(line);
+          for (int j = i + 1; j < urlIndex; j++) {
+            result.add(lines[j].trim());
+          }
+          result.add(absoluteUrl);
+          i = urlIndex;
+          lastWasRemoved = false;
+          continue;
         }
       }
 
-      if (!line.startsWith('#')) {
-        result.add(_getAbsoluteUrl(line, baseUri));
-      } else {
+      // 如果当前行是断点标记，且上一片刚被移除，我们需要谨慎处理这个标记
+      if (line.startsWith('#EXT-X-DISCONTINUITY')) {
+        // 暂存，稍后统一 sanitize
+        result.add(line);
+      } else if (line.startsWith('#')) {
         result.add(line);
       }
     }
-    return result.join('\n');
+
+    return _sanitizeDiscontinuity(result).join('\n');
+  }
+
+  /// 清理多余的不连续标记，防止播放器因分片移除导致的缓冲抖动
+  List<String> _sanitizeDiscontinuity(List<String> lines) {
+    final clean = <String>[];
+    for (int i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('#EXT-X-DISCONTINUITY')) {
+        // 如果是最后一行，或者紧接着又是 DISCONTINUITY，则移除
+        if (i == lines.length - 1) continue;
+        if (clean.isNotEmpty && clean.last.startsWith('#EXT-X-DISCONTINUITY')) continue;
+      }
+      clean.add(lines[i]);
+    }
+    return clean;
   }
 
   String _getAbsoluteUrl(String path, Uri baseUri) {

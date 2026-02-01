@@ -704,7 +704,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     final oldPlayPosition = _videoController?.value.position.inSeconds.toDouble() ?? 0.0;
     setState(() {
       _currentSource = newSource;
-      _isInitializing = true;
+      // 不要在这里设置 _isInitializing = true，因为 _initializePlayer 内部会处理并检查它
     });
     _loadSkipConfig();
     final targetIndex = _currentEpisodeIndex >= newSource.playGroups.first.urls.length ? 0 : _currentEpisodeIndex;
