@@ -61,6 +61,7 @@ class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
         autoPlay: true,
         looping: false,
         aspectRatio: controller.value.aspectRatio,
+        allowFullScreen: true,
         customControls: ZenVideoControls(
           skipConfig: SkipConfig(), // 直播/单视频默认不跳过
         ),

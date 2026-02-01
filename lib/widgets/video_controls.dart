@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -360,20 +362,21 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                   _chewieController?.toggleFullScreen();
                 }),
 
-                _buildIconBtn(LucideIcons.maximize, () async {
-                  bool isFullScreen = await windowManager.isFullScreen();
-                  if (!isFullScreen) {
-                    if (!(_chewieController?.isFullScreen ?? false)) {
-                      _chewieController?.enterFullScreen();
+                if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux))
+                  _buildIconBtn(LucideIcons.maximize, () async {
+                    bool isFullScreen = await windowManager.isFullScreen();
+                    if (!isFullScreen) {
+                      if (!(_chewieController?.isFullScreen ?? false)) {
+                        _chewieController?.enterFullScreen();
+                      }
+                      await windowManager.setFullScreen(true);
+                    } else {
+                      await windowManager.setFullScreen(false);
+                      if (_chewieController?.isFullScreen ?? false) {
+                        _chewieController?.exitFullScreen();
+                      }
                     }
-                    await windowManager.setFullScreen(true);
-                  } else {
-                    await windowManager.setFullScreen(false);
-                    if (_chewieController?.isFullScreen ?? false) {
-                      _chewieController?.exitFullScreen();
-                    }
-                  }
-                }),
+                  }),
               ],
             ),
           ],
