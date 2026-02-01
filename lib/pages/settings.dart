@@ -69,8 +69,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final isPC = screenWidth > 800;
     final horizontalPadding = isPC ? 48.0 : 24.0;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return ZenScaffold(
       body: CustomScrollView(
         slivers: [
           const ZenSliverAppBar(
@@ -302,10 +301,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       icon: icon,
       title: title,
       showDivider: showDivider,
-      trailing: Switch(
+      trailing: ZenSwitch(
         value: value,
         onChanged: onChanged,
-        activeColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }

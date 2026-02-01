@@ -147,8 +147,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final availableWidth = screenWidth - (isPC ? 240 : 0) - (horizontalPadding * 2);
     final crossAxisCount = availableWidth > 800 ? 5 : (availableWidth > 600 ? 4 : (availableWidth > 400 ? 3 : 2));
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return ZenScaffold(
       body: CustomScrollView(
         slivers: [
           const ZenSliverAppBar(
@@ -191,11 +190,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                         const SizedBox(width: 4),
                         Transform.scale(
                           scale: 0.8,
-                          child: Switch(
+                          child: ZenSwitch(
                             value: isAggregate,
                             onChanged: (val) => ref.read(aggregateSearchProvider.notifier).setEnabled(val),
-                            activeColor: theme.colorScheme.primary,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                         ),
                       ],

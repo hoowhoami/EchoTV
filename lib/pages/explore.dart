@@ -221,8 +221,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
             ? 3  // 普通手机横屏/大屏手机
             : 2; // 小屏手机
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return ZenScaffold(
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [

@@ -7,6 +7,7 @@ import 'package:chewie/chewie.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
 import '../models/site.dart';
+import 'zen_ui.dart';
 
 class ZenVideoControls extends StatefulWidget {
   final bool isAdBlockingEnabled;
@@ -171,43 +172,46 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       child: GestureDetector(
         onTap: () {}, // 拦截点击，防止冒泡到顶层导致面板关闭
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          width: 220,
-          color: Colors.black.withOpacity(0.9),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (_showSpeedSubMenu) {
-                          setState(() => _showSpeedSubMenu = false);
-                        } else {
-                          setState(() {
-                            _showSettings = false;
-                            _startHideTimer();
-                          });
-                        }
-                      },
-                      child: const Icon(LucideIcons.chevronLeft, color: Colors.white70, size: 16),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _showSpeedSubMenu ? '播放倍速' : '播放设置',
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+        child: Theme(
+          data: ThemeData(brightness: Brightness.dark),
+          child: Container(
+            width: 220,
+            color: Colors.black.withOpacity(0.9),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (_showSpeedSubMenu) {
+                            setState(() => _showSpeedSubMenu = false);
+                          } else {
+                            setState(() {
+                              _showSettings = false;
+                              _startHideTimer();
+                            });
+                          }
+                        },
+                        child: const Icon(LucideIcons.chevronLeft, color: Colors.white70, size: 16),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _showSpeedSubMenu ? '播放倍速' : '播放设置',
+                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Divider(color: Colors.white12, height: 1),
-              Expanded(
-                child: _showSpeedSubMenu ? _buildSpeedList() : _buildMainSettingsList(),
-              ),
-            ],
+                const Divider(color: Colors.white12, height: 1),
+                Expanded(
+                  child: _showSpeedSubMenu ? _buildSpeedList() : _buildMainSettingsList(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -229,13 +233,9 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
           title: '去广告',
           trailing: Transform.scale(
             scale: 0.7,
-            child: Switch(
+            child: ZenSwitch(
               value: widget.isAdBlockingEnabled,
               onChanged: (val) => widget.onAdBlockingToggle?.call(),
-              activeColor: Colors.greenAccent,
-              activeTrackColor: Colors.greenAccent.withValues(alpha: 0.3),
-              inactiveThumbColor: Colors.grey,
-              inactiveTrackColor: Colors.white10,
             ),
           ),
         ),
@@ -243,7 +243,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
           title: '跳过片头片尾',
           trailing: Transform.scale(
             scale: 0.7,
-            child: Switch(
+            child: ZenSwitch(
               value: _localSkipConfig.enable,
               onChanged: (val) {
                 final newConfig = SkipConfig(
@@ -254,10 +254,6 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                 setState(() => _localSkipConfig = newConfig);
                 widget.onSkipConfigChange?.call(newConfig);
               },
-              activeColor: Colors.greenAccent,
-              activeTrackColor: Colors.greenAccent.withValues(alpha: 0.3),
-              inactiveThumbColor: Colors.grey,
-              inactiveTrackColor: Colors.white10,
             ),
           ),
         ),
@@ -278,7 +274,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
         ),
         _buildSettingItem(
           title: '设当前为片尾',
-          subtitle: _localSkipConfig.outroTime > 0 ? '倒数 ${_localSkipConfig.outroTime}s' : '未设置',
+          subtitle: _localSkipConfig.outroTime > 0 ? '跳过最后 ${_localSkipConfig.outroTime}s' : '未设置',
           onTap: () {
             final currentPos = _videoPlayerController?.value.position.inSeconds ?? 0;
             final total = _videoPlayerController?.value.duration.inSeconds ?? 0;

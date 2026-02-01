@@ -5,6 +5,74 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../models/movie.dart';
 import 'cover_image.dart';
 
+class ZenScaffold extends StatelessWidget {
+  final Widget body;
+  final PreferredSizeWidget? appBar;
+  final Widget? bottomNavigationBar;
+  final bool extendBodyBehindAppBar;
+  final Color? backgroundColor;
+
+  const ZenScaffold({
+    super.key,
+    required this.body,
+    this.appBar,
+    this.bottomNavigationBar,
+    this.extendBodyBehindAppBar = false,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: backgroundColor ?? theme.scaffoldBackgroundColor,
+      appBar: appBar,
+      body: body,
+      bottomNavigationBar: bottomNavigationBar,
+      extendBodyBehindAppBar: extendBodyBehindAppBar,
+    );
+  }
+}
+
+class ZenSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final Color? activeTrackColor;
+  final Color? inactiveTrackColor;
+  final double scale;
+
+  const ZenSwitch({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.activeTrackColor,
+    this.inactiveTrackColor,
+    this.scale = 0.7,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Transform.scale(
+      scale: scale,
+      child: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: theme.colorScheme.onPrimary,
+        activeTrackColor: activeTrackColor ?? theme.colorScheme.primary,
+        inactiveThumbColor: isDark ? Colors.white38 : Colors.white,
+        inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.transparent;
+          return isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.1);
+        }),
+      ),
+    );
+  }
+}
+
 class ZenButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onPressed;

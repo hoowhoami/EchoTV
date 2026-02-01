@@ -59,8 +59,12 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-          TextButton(
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
             onPressed: () async {
               if (urlController.text.isNotEmpty) {
                 final newSource = LiveSource(
@@ -78,7 +82,7 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
                 Navigator.pop(context);
               }
             },
-            child: Text(source == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+            child: Text(source == null ? '添加' : '保存'),
           ),
         ],
       ),
@@ -91,8 +95,7 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
     final isPC = MediaQuery.of(context).size.width > 800;
     final horizontalPadding = isPC ? 48.0 : 24.0;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return ZenScaffold(
       body: CustomScrollView(
         slivers: [
           ZenSliverAppBar(
@@ -126,9 +129,30 @@ class _LiveManagePageState extends ConsumerState<LiveManagePage> {
                             IconButton(
                               icon: const Icon(LucideIcons.trash2, size: 18, color: Colors.redAccent),
                               onPressed: () async {
-                                _sources.removeAt(index);
-                                await ref.read(configServiceProvider).saveLiveSources(_sources);
-                                _load();
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => EditDialog(
+                                    title: const Text('确认删除'),
+                                    content: Text('确定要删除直播源 "${source.name}" 吗？'),
+                                    actions: [
+                                      ZenButton(
+                                        isSecondary: true,
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('取消'),
+                                      ),
+                                      ZenButton(
+                                        backgroundColor: Colors.redAccent,
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('删除'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _sources.removeAt(index);
+                                  await ref.read(configServiceProvider).saveLiveSources(_sources);
+                                  _load();
+                                }
                               },
                             ),
                           ],

@@ -105,6 +105,16 @@ class ZenTheme {
           fontWeight: FontWeight.bold,
         ),
       ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return lightAccent;
+          return null;
+        }),
+      ),
     );
   }
 
@@ -144,6 +154,16 @@ class ZenTheme {
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accentBlue; // 深色模式下开启状态使用亮蓝色轨道，非常醒目
+          return null;
+        }),
       ),
     );
   }

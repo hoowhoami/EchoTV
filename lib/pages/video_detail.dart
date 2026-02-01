@@ -18,6 +18,7 @@ import '../services/video_quality_service.dart';
 import '../services/source_optimizer_service.dart';
 import '../widgets/cover_image.dart';
 import '../widgets/video_controls.dart';
+import '../widgets/zen_ui.dart';
 
 class VideoDetailPage extends ConsumerStatefulWidget {
   final DoubanSubject subject;
@@ -640,8 +641,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     final isPC = screenWidth > 800;
     final horizontalPadding = isPC ? 48.0 : 24.0;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+    return ZenScaffold(
       body: Focus(
         autofocus: true,
         onKeyEvent: (node, event) {

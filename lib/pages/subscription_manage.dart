@@ -73,8 +73,12 @@ class _SubscriptionManagePageState extends ConsumerState<SubscriptionManagePage>
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.secondary))),
-            TextButton(
+            ZenButton(
+              isSecondary: true,
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            ZenButton(
               onPressed: () async {
                 if (urlController.text.isNotEmpty) {
                   final newSub = Subscription(
@@ -102,7 +106,7 @@ class _SubscriptionManagePageState extends ConsumerState<SubscriptionManagePage>
                   }
                 }
               },
-              child: Text(sub == null ? '添加' : '保存', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+              child: Text(sub == null ? '添加' : '保存'),
             ),
           ],
         ),
@@ -128,7 +132,7 @@ class _SubscriptionManagePageState extends ConsumerState<SubscriptionManagePage>
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged, activeColor: Theme.of(context).colorScheme.primary),
+          ZenSwitch(value: value, onChanged: onChanged),
         ],
       ),
     );
@@ -253,8 +257,7 @@ class _SubscriptionManagePageState extends ConsumerState<SubscriptionManagePage>
     final isPC = MediaQuery.of(context).size.width > 800;
     final horizontalPadding = isPC ? 48.0 : 24.0;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return ZenScaffold(
       body: CustomScrollView(
         slivers: [
           ZenSliverAppBar(
@@ -311,14 +314,13 @@ class _SubscriptionManagePageState extends ConsumerState<SubscriptionManagePage>
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Switch(
+                            ZenSwitch(
                               value: sub.enabled,
                               onChanged: (val) async {
                                 _subscriptions[index] = sub.copyWith(enabled: val);
                                 await ref.read(configServiceProvider).saveSubscriptions(_subscriptions);
                                 _load();
                               },
-                              activeColor: theme.colorScheme.primary,
                             ),
                             const SizedBox(width: 4),
                             IconButton(
@@ -341,12 +343,20 @@ class _SubscriptionManagePageState extends ConsumerState<SubscriptionManagePage>
                                 } else if (val == 'delete') {
                                   final confirm = await showDialog<bool>(
                                     context: context,
-                                    builder: (context) => AlertDialog(
+                                    builder: (context) => EditDialog(
                                       title: const Text('确认删除'),
                                       content: Text('确定要删除订阅 "${sub.name}" 吗？相关的站点和分类映射也将被移除。'),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-                                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除', style: TextStyle(color: Colors.redAccent))),
+                                        ZenButton(
+                                          isSecondary: true,
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text('取消'),
+                                        ),
+                                        ZenButton(
+                                          backgroundColor: Colors.redAccent,
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: const Text('删除'),
+                                        ),
                                       ],
                                     ),
                                   );

@@ -58,8 +58,7 @@ class _LivePageState extends ConsumerState<LivePage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isPC = screenWidth > 800;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return ZenScaffold(
       body: CustomScrollView(
         slivers: [
           ZenSliverAppBar(
