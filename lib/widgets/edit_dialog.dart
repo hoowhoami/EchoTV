@@ -9,7 +9,7 @@ class EditDialog extends StatelessWidget {
   final List<Widget> actions;
   final double? width;
 
-  const EditDialog({Key? key, required this.title, required this.content, required this.actions, this.width}) : super(key: key);
+  const EditDialog({super.key, required this.title, required this.content, required this.actions, this.width});
 
   @override
   Widget build(BuildContext context) {

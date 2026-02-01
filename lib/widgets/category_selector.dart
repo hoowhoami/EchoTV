@@ -6,11 +6,11 @@ class CategorySelector extends StatelessWidget {
   final Function(String) onCategoryChanged;
 
   const CategorySelector({
-    Key? key,
+    super.key,
     required this.selectedCategory,
     required this.categories,
     required this.onCategoryChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

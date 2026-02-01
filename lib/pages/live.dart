@@ -9,7 +9,7 @@ import '../widgets/zen_ui.dart';
 import 'play.dart';
 
 class LivePage extends ConsumerStatefulWidget {
-  const LivePage({Key? key}) : super(key: key);
+  const LivePage({super.key});
 
   @override
   ConsumerState<LivePage> createState() => _LivePageState();

@@ -7,7 +7,7 @@ import '../widgets/zen_ui.dart';
 import '../widgets/edit_dialog.dart';
 
 class SourceManagePage extends ConsumerStatefulWidget {
-  const SourceManagePage({Key? key}) : super(key: key);
+  const SourceManagePage({super.key});
 
   @override
   ConsumerState<SourceManagePage> createState() => _SourceManagePageState();

@@ -10,7 +10,7 @@ class PlayPage extends StatefulWidget {
   final String videoUrl;
   final String title;
 
-  const PlayPage({Key? key, required this.videoUrl, required this.title}) : super(key: key);
+  const PlayPage({super.key, required this.videoUrl, required this.title});
 
   @override
   State<PlayPage> createState() => _PlayPageState();

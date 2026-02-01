@@ -22,7 +22,7 @@ import '../widgets/video_controls.dart';
 class VideoDetailPage extends ConsumerStatefulWidget {
   final DoubanSubject subject;
 
-  const VideoDetailPage({Key? key, required this.subject}) : super(key: key);
+  const VideoDetailPage({super.key, required this.subject});
 
   @override
   ConsumerState<VideoDetailPage> createState() => _VideoDetailPageState();
@@ -1009,8 +1009,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     if (_availableSources.isEmpty && _isSearching) return const Center(child: CircularProgressIndicator());
     if (_availableSources.isEmpty) return const Center(child: Text('未搜到资源'));
     String statusText = '源站优选已完成';
-    if (_isSearching) statusText = '正在全网搜索源站...';
-    else if (_isOptimizing) statusText = '正在进行实时优选...';
+    if (_isSearching) {
+      statusText = '正在全网搜索源站...';
+    } else if (_isOptimizing) statusText = '正在进行实时优选...';
     final currentSource = _currentSource;
     final otherSources = _availableSources.where((s) => s != currentSource).toList();
     otherSources.sort((a, b) => (_scoreMap['${b.source}-${b.id}'] ?? -1.0).compareTo(_scoreMap['${a.source}-${a.id}'] ?? -1.0));

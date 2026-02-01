@@ -10,7 +10,7 @@ import '../widgets/zen_ui.dart';
 import '../widgets/edit_dialog.dart';
 
 class SubscriptionManagePage extends ConsumerStatefulWidget {
-  const SubscriptionManagePage({Key? key}) : super(key: key);
+  const SubscriptionManagePage({super.key});
 
   @override
   ConsumerState<SubscriptionManagePage> createState() => _SubscriptionManagePageState();

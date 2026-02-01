@@ -7,7 +7,7 @@ import '../widgets/zen_ui.dart';
 import '../widgets/edit_dialog.dart';
 
 class LiveManagePage extends ConsumerStatefulWidget {
-  const LiveManagePage({Key? key}) : super(key: key);
+  const LiveManagePage({super.key});
 
   @override
   ConsumerState<LiveManagePage> createState() => _LiveManagePageState();

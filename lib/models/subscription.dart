@@ -45,7 +45,7 @@ class Subscription {
     bool? enabled,
   }) {
     return Subscription(
-      id: this.id,
+      id: id,
       name: name ?? this.name,
       url: url ?? this.url,
       autoUpdate: autoUpdate ?? this.autoUpdate,

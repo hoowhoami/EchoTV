@@ -5,7 +5,6 @@ import 'package:chewie/chewie.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:window_manager/window_manager.dart';
 import '../models/site.dart';
-import 'zen_ui.dart';
 
 class ZenVideoControls extends StatefulWidget {
   final bool isAdBlockingEnabled;
@@ -16,14 +15,14 @@ class ZenVideoControls extends StatefulWidget {
   final Function(SkipConfig)? onSkipConfigChange;
 
   const ZenVideoControls({
-    Key? key,
+    super.key,
     this.isAdBlockingEnabled = true,
     this.onAdBlockingToggle,
     this.onNextEpisode,
     this.hasNextEpisode = false,
     required this.skipConfig,
     this.onSkipConfigChange,
-  }) : super(key: key);
+  });
 
   @override
   State<ZenVideoControls> createState() => _ZenVideoControlsState();
@@ -390,8 +389,9 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   Widget _buildVolumeButton(BuildContext context) {
     final volume = _videoPlayerController?.value.volume ?? 1.0;
     IconData iconData = LucideIcons.volume2;
-    if (volume == 0) iconData = LucideIcons.volumeX;
-    else if (volume < 0.5) iconData = LucideIcons.volume1;
+    if (volume == 0) {
+      iconData = LucideIcons.volumeX;
+    } else if (volume < 0.5) iconData = LucideIcons.volume1;
 
     return _HoverableIcon(
       icon: iconData, 
@@ -500,11 +500,11 @@ class _HoverableIcon extends StatefulWidget {
   final double size;
 
   const _HoverableIcon({
-    Key? key,
+    super.key,
     required this.icon,
     required this.onTap,
     this.size = 18,
-  }) : super(key: key);
+  });
 
   @override
   State<_HoverableIcon> createState() => _HoverableIconState();

@@ -16,7 +16,7 @@ class ZenButton extends StatefulWidget {
   final bool isSecondary;
 
   const ZenButton({
-    Key? key,
+    super.key,
     required this.child,
     required this.onPressed,
     this.backgroundColor,
@@ -25,7 +25,7 @@ class ZenButton extends StatefulWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
     this.height,
     this.isSecondary = false,
-  }) : super(key: key);
+  });
 
   @override
   State<ZenButton> createState() => _ZenButtonState();
@@ -104,13 +104,13 @@ class ZenGlassContainer extends StatelessWidget {
   final double opacity;
 
   const ZenGlassContainer({
-    Key? key,
+    super.key,
     required this.child,
     this.borderRadius = 40,
     this.blur = 40,
     this.backgroundColor,
     this.opacity = 0.1,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +235,7 @@ class MovieCard extends ConsumerWidget {
   final VoidCallback onTap;
   final String? badge;
 
-  const MovieCard({Key? key, required this.movie, required this.onTap, this.badge}) : super(key: key);
+  const MovieCard({super.key, required this.movie, required this.onTap, this.badge});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

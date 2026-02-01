@@ -10,14 +10,14 @@ class DoubanSelector extends StatefulWidget {
   final Function(Map<String, String>)? onMultiLevelChange;
 
   const DoubanSelector({
-    Key? key,
+    super.key,
     required this.type,
     required this.primarySelection,
     required this.secondarySelection,
     required this.onPrimaryChange,
     required this.onSecondaryChange,
     this.onMultiLevelChange,
-  }) : super(key: key);
+  });
 
   @override
   State<DoubanSelector> createState() => _DoubanSelectorState();
