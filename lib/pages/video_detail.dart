@@ -511,25 +511,25 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       );
     }
 
-    final playerHeight = isPC ? _calculatePlayerHeight(MediaQuery.of(context).size.width) : (MediaQuery.of(context).size.width / (16 / 9));
+    final screenWidth = MediaQuery.of(context).size.width;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+    final playerHeight = isPC ? _calculatePlayerHeight(screenWidth) : ((screenWidth - 2 * horizontalPadding) / (16 / 9));
 
-    return AspectRatio(
-      aspectRatio: isPC ? (MediaQuery.of(context).size.width * 0.7 / playerHeight) : 16 / 9,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.black, 
-          borderRadius: BorderRadius.circular(20), 
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3), 
-              blurRadius: 40, 
-              offset: const Offset(0, 20)
-            )
-          ]
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: content,
+    return Container(
+      height: playerHeight,
+      decoration: BoxDecoration(
+        color: Colors.black, 
+        borderRadius: BorderRadius.circular(20), 
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3), 
+            blurRadius: 40, 
+            offset: const Offset(0, 20)
+          )
+        ]
       ),
+      clipBehavior: Clip.antiAlias,
+      child: content,
     );
   }
 
