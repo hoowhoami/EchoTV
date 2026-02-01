@@ -14,6 +14,8 @@ class PlayPage extends ConsumerStatefulWidget {
 }
 
 class _PlayPageState extends ConsumerState<PlayPage> {
+  final GlobalKey _playerKey = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21,11 +23,15 @@ class _PlayPageState extends ConsumerState<PlayPage> {
       body: Stack(
         children: [
           Center(
-            child: EchoVideoPlayer(
-              url: widget.videoUrl,
-              title: widget.title,
-              isLive: true,
-              referer: widget.videoUrl.startsWith('http') ? Uri.parse(widget.videoUrl).origin : '',
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: EchoVideoPlayer(
+                key: _playerKey,
+                url: widget.videoUrl,
+                title: widget.title,
+                isLive: true,
+                referer: widget.videoUrl.startsWith('http') ? Uri.parse(widget.videoUrl).origin : '',
+              ),
             ),
           ),
           

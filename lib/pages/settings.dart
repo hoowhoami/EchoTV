@@ -235,6 +235,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         child: Column(
           children: [
             Padding(
@@ -661,6 +663,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             onSelect(e.key);
                             Navigator.pop(context);
                           },
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
                           child: Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
@@ -911,6 +915,8 @@ class TeenageModeSettingsPage extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         child: Column(
           children: [
             Padding(
@@ -1132,6 +1138,8 @@ class AdBlockSettingsPage extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         child: Column(
           children: [
             Padding(

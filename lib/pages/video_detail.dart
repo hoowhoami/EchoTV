@@ -52,6 +52,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   bool _isPlaying = false;
   bool _autoPlayNext = true;
 
+  final GlobalKey _playerKey = GlobalKey();
+
   final Map<String, VideoQualityInfo> _qualityInfoMap = {};
   final Map<String, double> _scoreMap = {};
   final Set<String> _testedSources = {};
@@ -368,7 +370,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isPC = screenWidth > 800;
+    final isPC = screenWidth > 960;
     final horizontalPadding = isPC ? 48.0 : 24.0;
 
     return ZenScaffold(
@@ -491,7 +493,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     } else {
       final url = _currentSource!.playGroups.first.urls[_currentEpisodeIndex];
       content = EchoVideoPlayer(
-        key: ValueKey(url),
+        key: _playerKey,
         url: url,
         title: '${widget.subject.title} - ${_currentSource!.playGroups.first.titles[_currentEpisodeIndex]}',
         referer: url.startsWith('http') ? Uri.parse(url).origin : '',
@@ -509,13 +511,26 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       );
     }
 
-    final playerContainer = Container(
-      height: isPC ? _calculatePlayerHeight(MediaQuery.of(context).size.width) : null,
-      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 40, offset: const Offset(0, 20))]),
-      clipBehavior: Clip.antiAlias,
-      child: content,
+    final playerHeight = isPC ? _calculatePlayerHeight(MediaQuery.of(context).size.width) : (MediaQuery.of(context).size.width / (16 / 9));
+
+    return AspectRatio(
+      aspectRatio: isPC ? (MediaQuery.of(context).size.width * 0.7 / playerHeight) : 16 / 9,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black, 
+          borderRadius: BorderRadius.circular(20), 
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3), 
+              blurRadius: 40, 
+              offset: const Offset(0, 20)
+            )
+          ]
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: content,
+      ),
     );
-    return isPC ? playerContainer : AspectRatio(aspectRatio: 16 / 9, child: playerContainer);
   }
 
   Widget _buildEpisodePanel(ThemeData theme, double height) {

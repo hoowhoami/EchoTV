@@ -41,11 +41,14 @@ class EchoVideoPlayer extends ConsumerStatefulWidget {
   ConsumerState<EchoVideoPlayer> createState() => _EchoVideoPlayerState();
 }
 
-class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBindingObserver {
+class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _isInitializing = false;
   bool _isDisposed = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -216,6 +219,7 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     // 核心修正：监听去广告开关，变化时重新初始化播放器
     ref.listen(adBlockEnabledProvider, (previous, next) {
       if (previous != next) {
