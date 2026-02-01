@@ -149,8 +149,9 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
               if (!_showSettings)
                 Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: <Widget>[
+                    _buildTopBar(context),
                     _buildBottomBar(context),
                   ],
                 ),
@@ -318,6 +319,27 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       dense: true,
       visualDensity: VisualDensity.compact,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context) {
+    final isFullScreen = _chewieController?.isFullScreen ?? false;
+    if (!isFullScreen) return const SizedBox.shrink();
+
+    return AnimatedOpacity(
+      opacity: _displayToggles ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        height: _barHeight + 20,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+        child: Row(
+          children: [
+            _buildIconBtn(LucideIcons.chevronLeft, () {
+               _chewieController?.toggleFullScreen();
+            }, size: 24),
+          ],
+        ),
+      ),
     );
   }
 
