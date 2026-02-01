@@ -1,49 +1,52 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/theme.dart';
-import 'services/config_service.dart';
-import 'services/subscription_service.dart';
-import 'widgets/edit_dialog.dart';
-import 'widgets/zen_ui.dart';
 import 'pages/home.dart';
 import 'pages/explore.dart';
-import 'pages/play.dart';
-import 'pages/search.dart';
 import 'pages/live.dart';
+import 'pages/play.dart';
 import 'pages/settings.dart';
+import 'pages/search.dart';
 import 'providers/settings_provider.dart';
+import 'services/ad_block_service.dart';
+import 'services/config_service.dart';
+import 'services/subscription_service.dart';
 import 'widgets/main_layout.dart';
+import 'widgets/edit_dialog.dart';
+import 'widgets/zen_ui.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 仅在桌面端初始化窗口管理器
   if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
     await windowManager.ensureInitialized();
-
     WindowOptions windowOptions = const WindowOptions(
-      size: Size(1280, 800),
-      minimumSize: Size(800, 600),
+      size: Size(1280, 720),
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.normal,
-      title: 'EchoTV',
     );
-
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
-      // 拦截原生关闭按钮
-      await windowManager.setPreventClose(true);
     });
   }
 
-  runApp(const ProviderScope(child: EchoTVApp()));
+  final container = ProviderContainer();
+  // 初始化广告拦截服务器
+  await container.read(adBlockServiceProvider).init();
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const EchoTVApp(),
+    ),
+  );
 }
 
 class EchoTVApp extends ConsumerStatefulWidget {

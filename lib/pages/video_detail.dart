@@ -16,6 +16,7 @@ import '../services/config_service.dart';
 import '../providers/history_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/video_quality_service.dart';
+import '../services/ad_block_service.dart';
 import '../services/source_optimizer_service.dart';
 import '../widgets/cover_image.dart';
 import '../widgets/video_controls.dart';
@@ -355,19 +356,51 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
         
 
-        await Future.delayed(const Duration(milliseconds: 300));
+                await Future.delayed(const Duration(milliseconds: 300));
 
-  
+        
 
-        if (!mounted) return;
+        
 
-  
+        
 
-        final controller = VideoPlayerController.networkUrl(
+                if (!mounted) return;
 
-          Uri.parse(url),
+        
 
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        
+
+        
+
+                // 如果开启去广告，则通过本地代理处理 M3U8
+
+        
+
+                final playUrl = _isAdBlockingEnabled 
+
+        
+
+                    ? ref.read(adBlockServiceProvider).getProxyUrl(url) 
+
+        
+
+                    : url;
+
+        
+
+        
+
+        
+
+                final controller = VideoPlayerController.networkUrl(
+
+        
+
+                  Uri.parse(playUrl),
+
+        
+
+                  videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
 
           httpHeaders: {
 

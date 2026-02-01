@@ -8,6 +8,7 @@ import '../models/site.dart';
 import '../widgets/zen_ui.dart';
 import '../widgets/video_controls.dart';
 import '../providers/settings_provider.dart';
+import '../services/ad_block_service.dart';
 
 class PlayPage extends ConsumerStatefulWidget {
   final String videoUrl;
@@ -47,8 +48,11 @@ class _PlayPageState extends ConsumerState<PlayPage> with WidgetsBindingObserver
       await oldPlayer?.dispose();
       await Future.delayed(const Duration(milliseconds: 200));
 
+      // 直播也应用去广告代理（针对 M3U 里的插播广告）
+      final playUrl = ref.read(adBlockServiceProvider).getProxyUrl(widget.videoUrl);
+
       final controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.videoUrl),
+        Uri.parse(playUrl),
         httpHeaders: {
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           'Referer': widget.videoUrl.startsWith('http') ? Uri.parse(widget.videoUrl).origin : '',
