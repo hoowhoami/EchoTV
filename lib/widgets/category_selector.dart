@@ -22,9 +22,11 @@ class CategorySelector extends StatelessWidget {
           final isSelected = category == selectedCategory;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => onCategoryChanged(category),
-              child: AnimatedContainer(
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => onCategoryChanged(category),
+                child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
@@ -50,9 +52,10 @@ class CategorySelector extends StatelessWidget {
                 ),
               ),
             ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+          ),
+        );
+      }).toList(),
+    ),
+  );
+}
 }

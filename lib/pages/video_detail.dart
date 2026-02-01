@@ -14,6 +14,7 @@ import '../services/cms_service.dart';
 import '../services/douban_service.dart';
 import '../services/config_service.dart';
 import '../providers/history_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/video_quality_service.dart';
 import '../services/source_optimizer_service.dart';
 import '../widgets/cover_image.dart';
@@ -34,12 +35,14 @@ enum LoadingStage { searching, preferring, fetching, ready }
 class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   DoubanSubject? _fullSubject;
   late TabController _tabController;
+  late String _doubanId;
 
   List<VideoDetail> _availableSources = [];
   VideoDetail? _currentSource;
   int _currentEpisodeIndex = 0;
   double? _initialResumePosition;
   bool _isSearching = true;
+  bool _isDetailLoading = true;
   bool _isOptimizing = false;
   bool _isInitializing = false;
   LoadingStage _loadingStage = LoadingStage.searching;
@@ -67,6 +70,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   @override
   void initState() {
     super.initState();
+    _doubanId = widget.subject.id;
     WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this);
     _loadSettings();
@@ -122,6 +126,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       setState(() {
         _currentEpisodeIndex = record.index;
         _initialResumePosition = record.playTime.toDouble();
+        if (_doubanId.isEmpty && record.doubanId != null && record.doubanId!.isNotEmpty) {
+          _doubanId = record.doubanId!;
+        }
       });
     }
 
@@ -139,9 +146,26 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       _loadingMessage = '🔍 正在搜索播放源...';
     });
 
-    doubanService.getDetail(widget.subject.id).then((val) {
-      if (mounted) setState(() => _fullSubject = val ?? widget.subject);
-    });
+    if (_doubanId.isNotEmpty) {
+      doubanService.getDetail(_doubanId).then((val) {
+        if (val == null) {
+          debugPrint('⚠️ 豆瓣详情获取为空: id=$_doubanId');
+        } else {
+          debugPrint('✅ 豆瓣详情获取成功: ${val.title}');
+        }
+        if (mounted) {
+          setState(() {
+            _fullSubject = val ?? widget.subject;
+            _isDetailLoading = false;
+          });
+        }
+      }).catchError((e) {
+        debugPrint('❌ 豆瓣详情获取失败: $e');
+        if (mounted) setState(() => _isDetailLoading = false);
+      });
+    } else {
+      setState(() => _isDetailLoading = false);
+    }
 
     final sites = await configService.getSites();
 
@@ -166,6 +190,21 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       if (mounted) {
         setState(() {
           _availableSources = filtered;
+          // 兜底逻辑：如果豆瓣没抓到描述，且已经有了资源结果，使用第一个有描述的资源的详情
+          if ((_fullSubject?.description == null || _fullSubject!.description!.isEmpty) && filtered.isNotEmpty) {
+            final firstWithDesc = filtered.firstWhere((e) => e.desc != null && e.desc!.isNotEmpty, orElse: () => filtered.first);
+            if (firstWithDesc.desc != null && firstWithDesc.desc!.isNotEmpty) {
+              _fullSubject = DoubanSubject(
+                id: _doubanId,
+                title: widget.subject.title,
+                rate: widget.subject.rate,
+                cover: widget.subject.cover,
+                year: widget.subject.year,
+                description: firstWithDesc.desc,
+              );
+              _isDetailLoading = false;
+            }
+          }
         });
         
         // 核心改变：启动动态初始化监测
@@ -434,11 +473,31 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   
 
-        await controller.initialize().timeout(const Duration(seconds: 30));
+                                await controller.initialize().timeout(const Duration(seconds: 30));
 
-        
+  
 
-        if (resumePosition != null && resumePosition > 1) {
+                                
+
+  
+
+                                // 设置初始音量为全局记忆值
+
+  
+
+                                final globalVolume = ref.read(playerVolumeProvider);
+
+  
+
+                                await controller.setVolume(globalVolume);
+
+  
+
+                                
+
+  
+
+                                if (resumePosition != null && resumePosition > 1) {
 
           await controller.seekTo(Duration(seconds: resumePosition.toInt()));
 
@@ -547,6 +606,10 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
           await ref.read(configServiceProvider).saveSkipConfig(key, newConfig);
           setState(() => _skipConfig = newConfig);
         },
+        initialVolume: ref.read(playerVolumeProvider),
+        onVolumeChanged: (vol) {
+          ref.read(playerVolumeProvider.notifier).setVolume(vol);
+        },
         hasNextEpisode: _currentSource != null && _currentEpisodeIndex < _currentSource!.playGroups.first.urls.length - 1,
         onNextEpisode: _playNextEpisode,
       ),
@@ -572,6 +635,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       totalTime: _videoController!.value.duration.inSeconds,
       saveTime: DateTime.now().millisecondsSinceEpoch,
       searchTitle: widget.subject.title,
+      doubanId: _doubanId,
     );
     ref.read(historyProvider.notifier).saveRecord(record);
   }
@@ -605,7 +669,10 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     // 手动操作，清除初始恢复进度
     _initialResumePosition = null;
     final oldPlayPosition = _videoController?.value.position.inSeconds.toDouble() ?? 0.0;
-    setState(() => _currentSource = newSource);
+    setState(() {
+      _currentSource = newSource;
+      _isInitializing = true;
+    });
     _loadSkipConfig();
     final targetIndex = _currentEpisodeIndex >= newSource.playGroups.first.urls.length ? 0 : _currentEpisodeIndex;
     _initializePlayer(newSource.playGroups.first.urls[targetIndex], targetIndex, resumePosition: oldPlayPosition, autoPlay: _isPlaying);
@@ -819,13 +886,30 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                 if (widget.subject.rate.isNotEmpty) Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Text('⭐ ${widget.subject.rate}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14))),
               ]),
               const SizedBox(height: 16),
-              Wrap(spacing: 12, children: [
-                if (widget.subject.year != null) _buildInfoBadge(widget.subject.year!, theme),
-                if (_currentSource != null) _buildInfoBadge(_currentSource!.sourceName, theme, isAccent: true),
-                _buildInfoBadge('${_currentSource?.playGroups.first.urls.length ?? 0} 集', theme),
+              Wrap(spacing: 12, runSpacing: 8, children: [
+                if (widget.subject.year != null && widget.subject.year!.isNotEmpty) 
+                  _buildInfoBadge(widget.subject.year!, theme),
+                if (_currentSource != null) 
+                  _buildInfoBadge(
+                    _currentSource!.sourceName, 
+                    theme, 
+                    isAccent: true,
+                    onTap: () => _tabController.animateTo(1)
+                  ),
+                if (_currentSource != null)
+                  _buildInfoBadge('${_currentSource!.playGroups.first.urls.length} 集', theme)
+                else if (_isSearching)
+                  Container(
+                    width: 60,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
               ]),
               const SizedBox(height: 24),
-              Text(_fullSubject?.description ?? '正在加载详情...', style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.7), height: 1.8, fontSize: 15)),
+              _buildDescriptionSection(theme),
             ],
           ),
         ),
@@ -833,117 +917,212 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     );
   }
 
-  Widget _buildInfoBadge(String text, ThemeData theme, {bool isAccent = false}) {
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: isAccent ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.onSurface.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)), child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isAccent ? theme.colorScheme.primary : theme.colorScheme.secondary)));
+  Widget _buildDescriptionSection(ThemeData theme) {
+    if (_fullSubject?.description != null && _fullSubject!.description!.isNotEmpty) {
+      return Text(
+        _fullSubject!.description!, 
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.7), 
+          height: 1.8, 
+          fontSize: 15
+        )
+      );
+    }
+
+    if (!_isDetailLoading) {
+       return Text(
+        '暂无详情介绍', 
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.4), 
+          fontSize: 14,
+          fontStyle: FontStyle.italic
+        )
+      );
+    }
+
+    // 骨架屏占位
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(3, (i) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Container(
+          width: i == 2 ? 200 : double.infinity,
+          height: 14,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      )),
+    );
+  }
+
+  Widget _buildInfoBadge(String text, ThemeData theme, {bool isAccent = false, VoidCallback? onTap}) {
+    return MouseRegion(
+      cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isAccent ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(8)
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isAccent ? theme.colorScheme.primary : theme.colorScheme.secondary
+            )
+          )
+        ),
+      ),
+    );
   }
 
   Widget _buildEpisodeTab(ThemeData theme) {
-    if (_isSearching) return const Center(child: CircularProgressIndicator());
-    if (_currentSource == null) return const Center(child: Text('暂无资源'));
+    if (_isSearching && _availableSources.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(strokeWidth: 2),
+            const SizedBox(height: 20),
+            Text('正在全网搜索播放源...', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+    
+    // 如果仍在搜索但已经有部分结果，或者搜索已结束但没结果
+    if (_currentSource == null) {
+      if (_isSearching) {
+        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      }
+      return const Center(child: Text('暂无资源'));
+    }
+    
     final group = _currentSource!.playGroups.first;
     
-    return Column(
+    return Stack(
       children: [
-        // 操控栏：自动播放 & 排序
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // 自动播放开关
-              GestureDetector(
-                onTap: () => setState(() => _autoPlayNext = !_autoPlayNext),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _autoPlayNext ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _autoPlayNext ? LucideIcons.playCircle : LucideIcons.stopCircle, 
-                          size: 14, 
-                          color: _autoPlayNext ? theme.colorScheme.primary : theme.colorScheme.secondary
+        Column(
+          children: [
+            // 操控栏：自动播放 & 排序
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // 自动播放开关
+                  GestureDetector(
+                    onTap: () => setState(() => _autoPlayNext = !_autoPlayNext),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _autoPlayNext ? theme.colorScheme.primary.withValues(alpha: 0.1) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '自动连播: ${_autoPlayNext ? "开" : "关"}', 
-                          style: TextStyle(
-                            fontSize: 11, 
-                            fontWeight: FontWeight.bold,
-                            color: _autoPlayNext ? theme.colorScheme.primary : theme.colorScheme.secondary
-                          )
+                        child: Row(
+                          children: [
+                            Icon(
+                              _autoPlayNext ? LucideIcons.playCircle : LucideIcons.stopCircle, 
+                              size: 14, 
+                              color: _autoPlayNext ? theme.colorScheme.primary : theme.colorScheme.secondary
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '自动连播: ${_autoPlayNext ? "开" : "关"}', 
+                              style: TextStyle(
+                                fontSize: 11, 
+                                fontWeight: FontWeight.bold,
+                                color: _autoPlayNext ? theme.colorScheme.primary : theme.colorScheme.secondary
+                              )
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // 排序切换
-              GestureDetector(
-                onTap: () => setState(() => _descending = !_descending),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.arrowUpDown, size: 14, color: theme.colorScheme.primary),
-                      const SizedBox(width: 6),
-                      Text(
-                        _descending ? '倒序' : '正序', 
-                        style: TextStyle(
-                          fontSize: 12, 
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary
-                        )
                       ),
-                    ],
+                    ),
                   ),
+                  // 排序切换
+                  GestureDetector(
+                    onTap: () => setState(() => _descending = !_descending),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Row(
+                        children: [
+                          Icon(LucideIcons.arrowUpDown, size: 14, color: theme.colorScheme.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            _descending ? '倒序' : '正序', 
+                            style: TextStyle(
+                              fontSize: 12, 
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary
+                            )
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 16, indent: 16, endIndent: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: List.generate(group.urls.length, (i) {
+                    final index = _descending ? (group.urls.length - 1 - i) : i;
+                    final isCurrent = _currentEpisodeIndex == index && (_chewieController != null || _isInitializing);
+                    final title = group.titles[index];
+                    
+                    return GestureDetector(
+                      onTap: _isInitializing ? null : () => _handlePlayAction(index),
+                      child: MouseRegion(
+                        cursor: _isInitializing ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          constraints: const BoxConstraints(minWidth: 60),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12, 
+                              fontWeight: FontWeight.bold, 
+                              color: isCurrent ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) : theme.colorScheme.onSurface
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const Divider(height: 16, indent: 16, endIndent: 16),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: List.generate(group.urls.length, (i) {
-                final index = _descending ? (group.urls.length - 1 - i) : i;
-                final isCurrent = _currentEpisodeIndex == index && (_chewieController != null || _isInitializing);
-                final title = group.titles[index];
-                
-                return GestureDetector(
-                  onTap: () => _handlePlayAction(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    constraints: const BoxConstraints(minWidth: 60),
-                    decoration: BoxDecoration(
-                      color: isCurrent ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12, 
-                        fontWeight: FontWeight.bold, 
-                        color: isCurrent ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) : theme.colorScheme.onSurface
-                      ),
-                    ),
-                  ),
-                );
-              }),
+        if (_isInitializing)
+          Positioned.fill(
+            child: Container(
+              color: theme.colorScheme.surface.withValues(alpha: 0.5),
+              child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           ),
-        ),
       ],
     );
   }

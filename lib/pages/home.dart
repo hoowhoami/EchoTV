@@ -149,17 +149,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                             curve: Curves.easeOut,
                           );
                         },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.chevron_left,
-                            color: Colors.white,
-                            size: 28,
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.chevron_left,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                           ),
                         ),
                       ),
@@ -179,17 +182,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                             curve: Curves.easeOut,
                           );
                         },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.chevron_right,
-                            color: Colors.white,
-                            size: 28,
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                           ),
                         ),
                       ),
@@ -401,7 +407,7 @@ class _ContinueWatchingCardState extends ConsumerState<_ContinueWatchingCard> {
             GestureDetector(
               onTap: () {
                 final subject = DoubanSubject(
-                  id: '',
+                  id: record.doubanId ?? '',
                   title: record.searchTitle,
                   rate: '0.0',
                   cover: record.cover,

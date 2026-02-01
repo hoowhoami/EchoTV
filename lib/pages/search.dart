@@ -357,14 +357,17 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             ),
           ),
           if (_controller.text.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                _controller.clear();
-                setState(() => _isSearching = false);
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Icon(LucideIcons.xCircle, size: 16, color: theme.colorScheme.secondary.withValues(alpha: 0.6)),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  _controller.clear();
+                  setState(() => _isSearching = false);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(LucideIcons.xCircle, size: 16, color: theme.colorScheme.secondary.withValues(alpha: 0.6)),
+                ),
               ),
             )
           else
@@ -383,9 +386,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text('最近搜索', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            TextButton(
-              onPressed: _clearHistory,
-              child: Text('清空', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12)),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: TextButton(
+                onPressed: _clearHistory,
+                child: Text('清空', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12)),
+              ),
             ),
           ],
         ),
@@ -408,14 +414,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
-            onTap: () => _handleSearch(text),
-            child: Text(text, style: const TextStyle(fontSize: 13)),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => _handleSearch(text),
+              child: Text(text, style: const TextStyle(fontSize: 13)),
+            ),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => _deleteHistory(text),
-            child: Icon(LucideIcons.x, size: 12, color: theme.colorScheme.secondary.withValues(alpha: 0.5)),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => _deleteHistory(text),
+              child: Icon(LucideIcons.x, size: 12, color: theme.colorScheme.secondary.withValues(alpha: 0.5)),
+            ),
           ),
         ],
       ),

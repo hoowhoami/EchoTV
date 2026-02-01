@@ -30,6 +30,7 @@ class ConfigService {
   static const String keyHistory = 'play_history';
   static const String keySkipConfigs = 'skip_configs';
   static const String keyHasAgreedTerms = 'has_agreed_terms';
+  static const String keyPlayerVolume = 'player_volume';
 
   Future<bool> getHasAgreedTerms() async {
     final prefs = await SharedPreferences.getInstance();
@@ -312,6 +313,16 @@ class ConfigService {
     configs[key] = config;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(keySkipConfigs, jsonEncode(configs.map((key, value) => MapEntry(key, value.toJson()))));
+  }
+
+  Future<double> getPlayerVolume() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(keyPlayerVolume) ?? 0.5;
+  }
+
+  Future<void> setPlayerVolume(double volume) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(keyPlayerVolume, volume);
   }
 
   Future<String> exportAll() async {

@@ -17,6 +17,8 @@ class ZenVideoControls extends StatefulWidget {
   final bool hasNextEpisode;
   final SkipConfig skipConfig;
   final Function(SkipConfig)? onSkipConfigChange;
+  final double initialVolume;
+  final Function(double)? onVolumeChanged;
 
   const ZenVideoControls({
     super.key,
@@ -26,6 +28,8 @@ class ZenVideoControls extends StatefulWidget {
     this.hasNextEpisode = false,
     required this.skipConfig,
     this.onSkipConfigChange,
+    this.initialVolume = 0.5,
+    this.onVolumeChanged,
   });
 
   @override
@@ -41,6 +45,8 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   bool _showSpeedSubMenu = false;
   bool _isBarHovered = false;
   bool _isLocked = false;
+  bool _showVolumeSlider = false;
+  double _lastVolume = 0.5;
   bool _showHint = false;
   String _hintText = '';
   IconData _hintIcon = LucideIcons.play;
@@ -55,6 +61,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   void initState() {
     super.initState();
     _localSkipConfig = widget.skipConfig;
+    _lastVolume = widget.initialVolume;
     windowManager.addListener(this);
   }
 
@@ -159,6 +166,18 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       final newPos = _videoPlayerController!.value.position + const Duration(seconds: 10);
       _videoPlayerController!.seekTo(newPos);
       _showActionHint('+10s', LucideIcons.fastForward);
+      _cancelAndRestartTimer();
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      final newVol = (_videoPlayerController!.value.volume + 0.1).clamp(0.0, 1.0);
+      _videoPlayerController!.setVolume(newVol);
+      if (newVol > 0) _lastVolume = newVol;
+      _showActionHint('音量: ${(newVol * 100).toInt()}%', newVol == 0 ? LucideIcons.volumeX : (newVol < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2));
+      _cancelAndRestartTimer();
+    } else if (key == LogicalKeyboardKey.arrowDown) {
+      final newVol = (_videoPlayerController!.value.volume - 0.1).clamp(0.0, 1.0);
+      _videoPlayerController!.setVolume(newVol);
+      if (newVol > 0) _lastVolume = newVol;
+      _showActionHint('音量: ${(newVol * 100).toInt()}%', newVol == 0 ? LucideIcons.volumeX : (newVol < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2));
       _cancelAndRestartTimer();
     } else if (key == LogicalKeyboardKey.keyL) {
       setState(() => _isLocked = !_isLocked);
@@ -571,14 +590,63 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     IconData iconData = LucideIcons.volume2;
     if (volume == 0) {
       iconData = LucideIcons.volumeX;
-    } else if (volume < 0.5) iconData = LucideIcons.volume1;
+    } else if (volume < 0.5) {
+      iconData = LucideIcons.volume1;
+    }
 
-    return _HoverableIcon(
-      icon: iconData, 
-      onTap: () {
-        final newVol = (volume == 0) ? 1.0 : 0.0;
-        _videoPlayerController?.setVolume(newVol);
-      }
+    return MouseRegion(
+      onEnter: (_) => setState(() => _showVolumeSlider = true),
+      onExit: (_) => setState(() => _showVolumeSlider = false),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _HoverableIcon(
+            icon: iconData,
+            onTap: () {
+              if (volume > 0) {
+                _lastVolume = volume;
+                _videoPlayerController?.setVolume(0.0);
+              } else {
+                _videoPlayerController?.setVolume(_lastVolume);
+              }
+              _cancelAndRestartTimer();
+            },
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: _showVolumeSlider ? 100 : 0,
+            height: 30,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: SizedBox(
+                width: 100,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 2.0,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                    activeTrackColor: Colors.white,
+                    inactiveTrackColor: Colors.white24,
+                    thumbColor: Colors.white,
+                  ),
+                  child: Slider(
+                    value: volume,
+                    onChanged: (val) {
+                      _videoPlayerController?.setVolume(val);
+                      if (val > 0) {
+                        _lastVolume = val;
+                        widget.onVolumeChanged?.call(val);
+                      }
+                      _cancelAndRestartTimer();
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -698,6 +766,7 @@ class _HoverableIconState extends State<_HoverableIcon> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,

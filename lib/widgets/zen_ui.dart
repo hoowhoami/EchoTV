@@ -55,11 +55,13 @@ class ZenSwitch extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Transform.scale(
-      scale: scale,
-      child: Switch(
-        value: value,
-        onChanged: onChanged,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Transform.scale(
+        scale: scale,
+        child: Switch(
+          value: value,
+          onChanged: onChanged,
         activeColor: theme.colorScheme.onPrimary,
         activeTrackColor: activeTrackColor ?? theme.colorScheme.primary,
         inactiveThumbColor: isDark ? Colors.white38 : Colors.white,
@@ -69,8 +71,9 @@ class ZenSwitch extends StatelessWidget {
           return isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.1);
         }),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class ZenButton extends StatefulWidget {

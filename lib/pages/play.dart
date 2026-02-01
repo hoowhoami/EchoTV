@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../models/site.dart';
 import '../widgets/zen_ui.dart';
 import '../widgets/video_controls.dart';
+import '../providers/settings_provider.dart';
 
-class PlayPage extends StatefulWidget {
+class PlayPage extends ConsumerStatefulWidget {
   final String videoUrl;
   final String title;
 
   const PlayPage({super.key, required this.videoUrl, required this.title});
 
   @override
-  State<PlayPage> createState() => _PlayPageState();
+  ConsumerState<PlayPage> createState() => _PlayPageState();
 }
 
-class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
+class _PlayPageState extends ConsumerState<PlayPage> with WidgetsBindingObserver {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isInitializing = false;
@@ -56,6 +59,10 @@ class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
 
       await controller.initialize().timeout(const Duration(seconds: 30));
       
+      // 设置全局音量
+      final globalVolume = ref.read(playerVolumeProvider);
+      await controller.setVolume(globalVolume);
+
       _chewieController = ChewieController(
         videoPlayerController: controller,
         autoPlay: true,
@@ -64,14 +71,12 @@ class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
         allowFullScreen: true,
         customControls: ZenVideoControls(
           skipConfig: SkipConfig(), // 直播/单视频默认不跳过
+          initialVolume: globalVolume,
+          onVolumeChanged: (vol) {
+            ref.read(playerVolumeProvider.notifier).setVolume(vol);
+          },
         ),
         materialProgressColors: ChewieProgressColors(
-          playedColor: Colors.white,
-          handleColor: Colors.white,
-          bufferedColor: Colors.white.withOpacity(0.3),
-          backgroundColor: Colors.white.withOpacity(0.1),
-        ),
-        cupertinoProgressColors: ChewieProgressColors(
           playedColor: Colors.white,
           handleColor: Colors.white,
           bufferedColor: Colors.white.withOpacity(0.3),
@@ -130,16 +135,13 @@ class _PlayPageState extends State<PlayPage> with WidgetsBindingObserver {
                   ),
           ),
           
-          // Back button
+          // Back button - 采用与点播页一致的简洁风格
           Positioned(
             top: 40,
             left: 20,
-            child: ZenButton(
-              padding: const EdgeInsets.all(12),
-              borderRadius: 20,
-              backgroundColor: Colors.black.withOpacity(0.5),
+            child: IconButton(
+              icon: const Icon(LucideIcons.chevronLeft, size: 28, color: Colors.white),
               onPressed: () => Navigator.of(context).pop(),
-              child: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white),
             ),
           ),
         ],

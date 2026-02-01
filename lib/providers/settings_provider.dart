@@ -87,3 +87,24 @@ class FilteredKeywordsModel extends Notifier<List<String>> {
     await configService.saveFilteredKeywords(keywords);
   }
 }
+
+final playerVolumeProvider = NotifierProvider<PlayerVolumeModel, double>(PlayerVolumeModel.new);
+
+class PlayerVolumeModel extends Notifier<double> {
+  @override
+  double build() {
+    _load();
+    return 0.5;
+  }
+
+  Future<void> _load() async {
+    final configService = ref.read(configServiceProvider);
+    state = await configService.getPlayerVolume();
+  }
+
+  Future<void> setVolume(double volume) async {
+    state = volume;
+    final configService = ref.read(configServiceProvider);
+    await configService.setPlayerVolume(volume);
+  }
+}

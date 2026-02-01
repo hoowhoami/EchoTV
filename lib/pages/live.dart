@@ -110,8 +110,10 @@ class _LivePageState extends ConsumerState<LivePage> {
                     final channel = _channels[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: GestureDetector(
-                        onTap: () {
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () {
                           if (context.mounted) {
                             Navigator.of(context).push(MaterialPageRoute(
                               builder: (context) => PlayPage(videoUrl: channel.url, title: channel.name),
@@ -149,12 +151,13 @@ class _LivePageState extends ConsumerState<LivePage> {
                           ),
                         ),
                       ),
-                    );
-                  },
-                  childCount: _channels.length,
-                ),
+                    ),
+                  );
+                },
+                childCount: _channels.length,
               ),
             ),
+          ),
             
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],

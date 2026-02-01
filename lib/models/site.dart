@@ -97,9 +97,10 @@ class PlayRecord {
   final int totalTime;
   final int saveTime;
   final String searchTitle;
-  PlayRecord({required this.title, required this.sourceName, required this.cover, required this.year, required this.index, required this.totalEpisodes, required this.playTime, required this.totalTime, required this.saveTime, required this.searchTitle});
-  Map<String, dynamic> toJson() => {'title': title, 'source_name': sourceName, 'cover': cover, 'year': year, 'index': index, 'total_episodes': totalEpisodes, 'play_time': playTime, 'total_time': totalTime, 'save_time': saveTime, 'search_title': searchTitle};
-  factory PlayRecord.fromJson(Map<String, dynamic> json) => PlayRecord(title: json['title'] ?? '', sourceName: json['source_name'] ?? '', cover: json['cover'] ?? '', year: json['year'] ?? '', index: json['index'] ?? 0, totalEpisodes: json['total_episodes'] ?? 0, playTime: json['play_time'] ?? 0, totalTime: json['total_time'] ?? 0, saveTime: json['save_time'] ?? 0, searchTitle: json['search_title'] ?? '');
+  final String? doubanId;
+  PlayRecord({required this.title, required this.sourceName, required this.cover, required this.year, required this.index, required this.totalEpisodes, required this.playTime, required this.totalTime, required this.saveTime, required this.searchTitle, this.doubanId});
+  Map<String, dynamic> toJson() => {'title': title, 'source_name': sourceName, 'cover': cover, 'year': year, 'index': index, 'total_episodes': totalEpisodes, 'play_time': playTime, 'total_time': totalTime, 'save_time': saveTime, 'search_title': searchTitle, 'douban_id': doubanId};
+  factory PlayRecord.fromJson(Map<String, dynamic> json) => PlayRecord(title: json['title'] ?? '', sourceName: json['source_name'] ?? '', cover: json['cover'] ?? '', year: json['year'] ?? '', index: json['index'] ?? 0, totalEpisodes: json['total_episodes'] ?? 0, playTime: json['play_time'] ?? 0, totalTime: json['total_time'] ?? 0, saveTime: json['save_time'] ?? 0, searchTitle: json['search_title'] ?? '', doubanId: json['douban_id']);
 }
 
 class SkipConfig {
