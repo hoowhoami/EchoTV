@@ -345,7 +345,6 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   }
 
   Widget _buildMainSettingsList() {
-    final theme = Theme.of(context);
     return ListView(
       padding: EdgeInsets.zero,
       children: [
@@ -505,6 +504,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   }
 
   Widget _buildBottomBar(BuildContext context) {
+    final isLive = _chewieController?.isLive ?? false;
     return AnimatedOpacity(
       opacity: _displayToggles ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 300),
@@ -535,12 +535,13 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                   const Spacer(),
                   
                   // 右侧组合：[设置] [应用全屏] [桌面全屏]
-                  _buildIconBtn(LucideIcons.settings, () {
-                    setState(() {
-                      _showSettings = true;
-                      _displayToggles = true;
-                    });
-                  }),
+                  if (!isLive)
+                    _buildIconBtn(LucideIcons.settings, () {
+                      setState(() {
+                        _showSettings = true;
+                        _displayToggles = true;
+                      });
+                    }),
 
                   _buildIconBtn(LucideIcons.expand, () {
                     if (_chewieController?.isFullScreen ?? false) {

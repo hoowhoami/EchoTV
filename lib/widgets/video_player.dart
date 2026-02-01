@@ -89,11 +89,24 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
       await Future.delayed(const Duration(milliseconds: 200));
       if (_isDisposed) return;
 
-      // 核心修正：从 ref.read 改为 ref.read(adBlockEnabledProvider) 确保获取最新状态
+      // 1. 判定是否为标准的 M3U8 格式（用于代理服务器处理）
+      final isM3u8 = widget.url.toLowerCase().contains('.m3u8');
+      
+      // 2. 判定是否需要开启去广告代理（仅限点播且是 M3U8）
       final isAdBlockEnabled = ref.read(adBlockEnabledProvider);
-      final playUrl = isAdBlockEnabled 
-          ? ref.read(adBlockServiceProvider).getProxyUrl(widget.url)
+      final playUrl = (!widget.isLive && isAdBlockEnabled && isM3u8)
+          ? ref.read(adBlockServiceProvider).getProxyUrl(widget.url, referer: widget.referer)
           : widget.url;
+
+      // 3. 判定是否给播放器 HLS 格式提示
+      // 如果链接含 .m3u8，或者被标记为直播且没有明显的其它视频后缀（兼容 PHP 动态流），则给 HLS 提示
+      bool useHlsHint = isM3u8;
+      if (widget.isLive && !isM3u8) {
+        final otherExtensions = ['.mp4', '.mov', '.mpd', '.mkv', '.webm'];
+        if (!otherExtensions.any((ext) => widget.url.toLowerCase().contains(ext))) {
+          useHlsHint = true; 
+        }
+      }
 
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(playUrl),
@@ -101,7 +114,7 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           if (widget.referer != null && widget.referer!.isNotEmpty) 'Referer': widget.referer!,
         },
-        formatHint: widget.url.toLowerCase().contains('.m3u8') ? VideoFormat.hls : null,
+        formatHint: useHlsHint ? VideoFormat.hls : null,
       );
       
       _videoController = controller;

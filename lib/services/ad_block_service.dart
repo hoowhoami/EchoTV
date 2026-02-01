@@ -17,7 +17,8 @@ class AdBlockService {
   int? _port;
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 15),
+    validateStatus: (status) => true, // 允许抓取 4xx/5xx 响应，避免抛出异常导致代理崩溃
     headers: {
       'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
     },
@@ -42,8 +43,10 @@ class AdBlockService {
           }
         } catch (e) {
           debugPrint('❌ Proxy Request Error: $e');
-          request.response.statusCode = HttpStatus.internalServerError;
-          await request.response.close();
+          try {
+            request.response.statusCode = HttpStatus.internalServerError;
+            await request.response.close();
+          } catch (_) {}
         }
       }, onError: (e) => debugPrint('⚠️ Server Listen Error: $e'));
     } catch (e) {
@@ -51,14 +54,21 @@ class AdBlockService {
     }
   }
 
-  String getProxyUrl(String originalUrl) {
+  String getProxyUrl(String originalUrl, {String? referer}) {
     if (_port == null) return originalUrl;
     final encodedUrl = base64Url.encode(utf8.encode(originalUrl));
-    return 'http://127.0.0.1:$_port/proxy?url=$encodedUrl';
+    String proxyUrl = 'http://127.0.0.1:$_port/proxy?url=$encodedUrl';
+    if (referer != null && referer.isNotEmpty) {
+      final encodedReferer = base64Url.encode(utf8.encode(referer));
+      proxyUrl += '&referer=$encodedReferer';
+    }
+    return proxyUrl;
   }
 
   Future<void> _handleProxyRequest(HttpRequest request) async {
     final encodedUrl = request.uri.queryParameters['url'];
+    final encodedReferer = request.uri.queryParameters['referer'];
+    
     if (encodedUrl == null) {
       request.response.statusCode = HttpStatus.badRequest;
       await request.response.close();
@@ -66,40 +76,65 @@ class AdBlockService {
     }
 
     final String originalUrl = utf8.decode(base64Url.decode(encodedUrl));
+    final String? referer = encodedReferer != null ? utf8.decode(base64Url.decode(encodedReferer)) : null;
     final uri = Uri.parse(originalUrl);
     
     try {
-      final response = await _dio.get<String>(
+      final response = await _dio.get<dynamic>(
         originalUrl,
-        options: Options(responseType: ResponseType.plain),
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {
+            if (referer != null) 'Referer': referer,
+          },
+        ),
       );
-      final String content = response.data ?? '';
       
-      if (content.isEmpty) {
-        request.response.statusCode = HttpStatus.noContent;
+      final List<int> bytes = response.data ?? [];
+      request.response.statusCode = response.statusCode ?? HttpStatus.ok;
+
+      // 透传所有源站返回的 headers (排除敏感的)
+      response.headers.forEach((name, values) {
+        if (name != 'content-length' && name != 'transfer-encoding' && name != 'content-encoding') {
+          for (var value in values) {
+            request.response.headers.add(name, value);
+          }
+        }
+      });
+      
+      if (bytes.isEmpty) {
         await request.response.close();
         return;
       }
 
+      final content = utf8.decode(bytes, allowMalformed: true);
       request.response.headers.add('Access-Control-Allow-Origin', '*');
-      request.response.headers.contentType = ContentType('application', 'vnd.apple.mpegurl', charset: 'utf-8');
 
-      if (content.contains('#EXT-X-STREAM-INF')) {
-        request.response.write(_proxyMasterPlaylist(content, uri));
-      } else if (content.contains('#EXTINF')) {
-        request.response.write(_filterAds(content, uri));
+      if (content.contains('#EXTM3U')) {
+        request.response.headers.contentType = ContentType('application', 'vnd.apple.mpegurl', charset: 'utf-8');
+        if (content.contains('#EXT-X-STREAM-INF')) {
+          request.response.write(_proxyMasterPlaylist(content, uri, referer: referer));
+        } else if (content.contains('#EXTINF')) {
+          request.response.write(_filterAds(content, uri));
+        } else {
+          request.response.write(content);
+        }
       } else {
-        request.response.write(content);
+        request.response.add(bytes);
       }
     } catch (e) {
       debugPrint('❌ AdBlock Proxy Fetch Error: $e URL: $originalUrl');
-      request.response.statusCode = HttpStatus.badGateway;
+      try {
+        request.response.statusCode = HttpStatus.badGateway;
+      } catch (_) {}
     } finally {
-      await request.response.close();
+      try {
+        await request.response.close();
+      } catch (_) {}
     }
   }
 
-  String _proxyMasterPlaylist(String content, Uri baseUri) {
+  String _proxyMasterPlaylist(String content, Uri baseUri, {String? referer}) {
     final lines = content.split('\n');
     final result = <String>[];
     for (var line in lines) {
@@ -108,7 +143,7 @@ class AdBlockService {
       if (trimmed.startsWith('#')) {
         result.add(trimmed);
       } else {
-        result.add(getProxyUrl(_getAbsoluteUrl(trimmed, baseUri)));
+        result.add(getProxyUrl(_getAbsoluteUrl(trimmed, baseUri), referer: referer));
       }
     }
     return result.join('\n');
