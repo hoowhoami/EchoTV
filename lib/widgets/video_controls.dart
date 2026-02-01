@@ -107,11 +107,9 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
   void _startHideTimer() {
     _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
+      if (mounted && !_showSettings) {
         setState(() {
           _displayToggles = false;
-          _showSettings = false;
-          _showSpeedSubMenu = false;
         });
       }
     });
@@ -131,7 +129,10 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
             setState(() {
               _showSettings = false;
               _showSpeedSubMenu = false;
+              _startHideTimer();
             });
+          } else if (_displayToggles) {
+            setState(() => _displayToggles = false);
           } else {
             _cancelAndRestartTimer();
           }
@@ -167,70 +168,81 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       right: 0,
       top: 0,
       bottom: 0,
-      child: Container(
-        width: 220,
-        color: Colors.black.withOpacity(0.9),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (_showSpeedSubMenu) {
-                        setState(() => _showSpeedSubMenu = false);
-                      } else {
-                        setState(() => _showSettings = false);
-                      }
-                    },
-                    child: const Icon(LucideIcons.chevronLeft, color: Colors.white70, size: 16),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _showSpeedSubMenu ? '播放倍速' : '播放设置',
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ],
+      child: GestureDetector(
+        onTap: () {}, // 拦截点击，防止冒泡到顶层导致面板关闭
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 220,
+          color: Colors.black.withOpacity(0.9),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (_showSpeedSubMenu) {
+                          setState(() => _showSpeedSubMenu = false);
+                        } else {
+                          setState(() {
+                            _showSettings = false;
+                            _startHideTimer();
+                          });
+                        }
+                      },
+                      child: const Icon(LucideIcons.chevronLeft, color: Colors.white70, size: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _showSpeedSubMenu ? '播放倍速' : '播放设置',
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Divider(color: Colors.white12, height: 1),
-            Expanded(
-              child: _showSpeedSubMenu ? _buildSpeedList() : _buildMainSettingsList(),
-            ),
-          ],
+              const Divider(color: Colors.white12, height: 1),
+              Expanded(
+                child: _showSpeedSubMenu ? _buildSpeedList() : _buildMainSettingsList(),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMainSettingsList() {
+    final theme = Theme.of(context);
     return ListView(
       padding: EdgeInsets.zero,
       children: [
         _buildSettingItem(
           title: '播放倍速',
           subtitle: '${_latestValue?.playbackSpeed}x',
-          trailing: const Icon(LucideIcons.chevronRight, color: Colors.white38, size: 14),
+          trailing: const Icon(LucideIcons.chevronRight, color: Colors.white38, size: 12),
           onTap: () => setState(() => _showSpeedSubMenu = true),
         ),
         _buildSettingItem(
           title: '去广告',
           trailing: Transform.scale(
-            scale: 0.6,
+            scale: 0.7,
             child: Switch(
               value: widget.isAdBlockingEnabled,
               onChanged: (val) => widget.onAdBlockingToggle?.call(),
-              activeColor: Theme.of(context).primaryColor,
+              activeColor: Colors.greenAccent,
+              activeTrackColor: Colors.greenAccent.withValues(alpha: 0.3),
+              inactiveThumbColor: Colors.grey,
+              inactiveTrackColor: Colors.white10,
             ),
           ),
         ),
         _buildSettingItem(
           title: '跳过片头片尾',
           trailing: Transform.scale(
-            scale: 0.6,
+            scale: 0.7,
             child: Switch(
               value: _localSkipConfig.enable,
               onChanged: (val) {
@@ -242,7 +254,10 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                 setState(() => _localSkipConfig = newConfig);
                 widget.onSkipConfigChange?.call(newConfig);
               },
-              activeColor: Theme.of(context).primaryColor,
+              activeColor: Colors.greenAccent,
+              activeTrackColor: Colors.greenAccent.withValues(alpha: 0.3),
+              inactiveThumbColor: Colors.grey,
+              inactiveTrackColor: Colors.white10,
             ),
           ),
         ),
@@ -297,14 +312,17 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       padding: EdgeInsets.zero,
       children: speeds.map((speed) {
         final isSelected = _latestValue?.playbackSpeed == speed;
-        return _buildSettingItem(
-          title: '${speed}x',
-          textColor: isSelected ? Theme.of(context).primaryColor : Colors.white,
-          trailing: isSelected ? Icon(LucideIcons.check, color: Theme.of(context).primaryColor, size: 14) : null,
-          onTap: () {
-            _videoPlayerController?.setPlaybackSpeed(speed);
-            setState(() => _showSpeedSubMenu = false);
-          },
+        return Container(
+          color: isSelected ? Colors.greenAccent.withValues(alpha: 0.1) : Colors.transparent,
+          child: _buildSettingItem(
+            title: '${speed}x',
+            textColor: isSelected ? Colors.greenAccent : Colors.white,
+            trailing: isSelected ? const Icon(LucideIcons.check, color: Colors.greenAccent, size: 14) : null,
+            onTap: () {
+              _videoPlayerController?.setPlaybackSpeed(speed);
+              setState(() => _showSpeedSubMenu = false);
+            },
+          ),
         );
       }).toList(),
     );
@@ -312,8 +330,8 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
   Widget _buildSettingItem({required String title, String? subtitle, Widget? trailing, VoidCallback? onTap, Color? textColor}) {
     return ListTile(
-      title: Text(title, style: TextStyle(color: textColor ?? Colors.white, fontSize: 13)),
-      subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 10)) : null,
+      title: Text(title, style: TextStyle(color: textColor ?? Colors.white, fontSize: 12)),
+      subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 9)) : null,
       trailing: trailing,
       onTap: onTap,
       dense: true,
@@ -330,13 +348,36 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       opacity: _displayToggles ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 300),
       child: Container(
-        height: _barHeight + 20,
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+        height: _barHeight + 40,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Row(
           children: [
-            _buildIconBtn(LucideIcons.chevronLeft, () {
-               _chewieController?.toggleFullScreen();
-            }, size: 24),
+            GestureDetector(
+              onTap: () {
+                if (_chewieController?.isFullScreen ?? false) {
+                  _chewieController?.exitFullScreen();
+                  // 仅在移动端作为备选方案执行 maybePop
+                  if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      if (context.mounted && Navigator.of(context).canPop()) {
+                        Navigator.of(context).maybePop();
+                      }
+                    });
+                  }
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white24, width: 1),
+                ),
+                child: const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 24),
+              ),
+            ),
           ],
         ),
       ),
@@ -381,7 +422,18 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                 }),
 
                 _buildIconBtn(LucideIcons.expand, () {
-                  _chewieController?.toggleFullScreen();
+                  if (_chewieController?.isFullScreen ?? false) {
+                    _chewieController?.exitFullScreen();
+                    if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        if (context.mounted && Navigator.of(context).canPop()) {
+                          Navigator.of(context).maybePop();
+                        }
+                      });
+                    }
+                  } else {
+                    _chewieController?.enterFullScreen();
+                  }
                 }),
 
                 if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux))
@@ -407,8 +459,8 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     );
   }
 
-  Widget _buildIconBtn(IconData icon, VoidCallback onTap) {
-    return _HoverableIcon(icon: icon, onTap: onTap);
+  Widget _buildIconBtn(IconData icon, VoidCallback onTap, {double size = 18}) {
+    return _HoverableIcon(icon: icon, onTap: onTap, size: size);
   }
 
   Widget _buildVolumeButton(BuildContext context) {
@@ -545,6 +597,7 @@ class _HoverableIconState extends State<_HoverableIcon> {
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
         child: AnimatedScale(
           scale: _isHovered ? 1.15 : 1.0,
           duration: const Duration(milliseconds: 150),

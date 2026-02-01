@@ -228,14 +228,18 @@ class _SidebarItemState extends State<_SidebarItem> {
                     : theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 14),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: widget.isActive ? FontWeight.w900 : FontWeight.w500,
-                  color: widget.isActive 
-                      ? (isDark ? Colors.black : Colors.white) 
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              Flexible(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: widget.isActive ? FontWeight.w900 : FontWeight.w500,
+                    color: widget.isActive 
+                        ? (isDark ? Colors.black : Colors.white) 
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
