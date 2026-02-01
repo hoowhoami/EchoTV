@@ -31,6 +31,48 @@ class ConfigService {
   static const String keySkipConfigs = 'skip_configs';
   static const String keyHasAgreedTerms = 'has_agreed_terms';
   static const String keyPlayerVolume = 'player_volume';
+  static const String keyAdBlockEnabled = 'enable_blockad';
+  static const String keyAdBlockKeywords = 'ad_block_keywords';
+  static const String keyAdBlockWhitelist = 'ad_block_whitelist';
+
+  static const List<String> defaultAdKeywords = [
+    'ads', 'union', 'click', 'p6p', 'pop', 'short.mp4', 'advert', 'adv.', 
+    'guanggao', 'miaopai', '666216.com', 'v.it608.com', 'ovscic'
+  ];
+
+  static const List<String> defaultAdWhitelist = [
+    '/video/', '_1080', '_720', '_480', '1080p', '720p', '/hls/video'
+  ];
+
+  Future<List<String>> getAdBlockKeywords() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(keyAdBlockKeywords) ?? defaultAdKeywords;
+  }
+
+  Future<void> setAdBlockKeywords(List<String> keywords) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(keyAdBlockKeywords, keywords);
+  }
+
+  Future<List<String>> getAdBlockWhitelist() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(keyAdBlockWhitelist) ?? defaultAdWhitelist;
+  }
+
+  Future<void> setAdBlockWhitelist(List<String> keywords) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(keyAdBlockWhitelist, keywords);
+  }
+
+  Future<bool> getAdBlockEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(keyAdBlockEnabled) ?? true;
+  }
+
+  Future<void> setAdBlockEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(keyAdBlockEnabled, enabled);
+  }
 
   Future<bool> getHasAgreedTerms() async {
     final prefs = await SharedPreferences.getInstance();

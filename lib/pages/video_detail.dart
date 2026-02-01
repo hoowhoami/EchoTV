@@ -21,6 +21,7 @@ import '../services/source_optimizer_service.dart';
 import '../widgets/cover_image.dart';
 import '../widgets/video_controls.dart';
 import '../widgets/zen_ui.dart';
+import '../widgets/video_player.dart';
 
 class VideoDetailPage extends ConsumerStatefulWidget {
   final DoubanSubject subject;
@@ -45,12 +46,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   bool _isSearching = true;
   bool _isDetailLoading = true;
   bool _isOptimizing = false;
-  bool _isInitializing = false;
   LoadingStage _loadingStage = LoadingStage.searching;
   String _loadingMessage = '🔍 正在搜索播放源...';
 
-  VideoPlayerController? _videoController;
-  ChewieController? _chewieController;
   bool _isPlaying = false;
   bool _autoPlayNext = true;
 
@@ -61,9 +59,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   bool _descending = false;
   bool _isEpisodeSelectorCollapsed = false;
   
-  // Skip Config and Ad Blocking
+  // Skip Config
   SkipConfig _skipConfig = SkipConfig();
-  bool _isAdBlockingEnabled = true;
 
   // 移除 Timer，改用状态位控制
   bool _hasTriggeredInitialInit = false;
@@ -74,17 +71,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     _doubanId = widget.subject.id;
     WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this);
-    _loadSettings();
     _checkHistoryAndLoadData();
     WakelockPlus.enable();
-  }
-
-  void _loadSettings() async {
-    final configService = ref.read(configServiceProvider);
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isAdBlockingEnabled = prefs.getBool('enable_blockad') ?? true;
-    });
   }
 
   void _loadSkipConfig() async {
@@ -229,7 +217,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     const int maxTicks = 20; // 约 4 秒
 
     while (tick < maxTicks) {
-      if (!mounted || _isPlaying || _isInitializing) return;
+      if (!mounted || _isPlaying) return;
 
       final bool hasHighQualitySource = _scoreMap.values.any((score) => score >= 90);
       final bool hasEnoughSamples = _testedSources.length >= 3 || _testedSources.length == _availableSources.length;
@@ -243,7 +231,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       tick++;
     }
 
-    if (mounted && _availableSources.isNotEmpty && !_isPlaying && !_isInitializing) {
+    if (mounted && _availableSources.isNotEmpty && !_isPlaying) {
       setState(() {
         _loadingStage = LoadingStage.preferring;
         _loadingMessage = '⚡ 正在优选最佳线路...';
@@ -262,12 +250,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         });
         
         _loadSkipConfig();
-        _initializePlayer(
-          _currentSource!.playGroups.first.urls[_currentEpisodeIndex], 
-          _currentEpisodeIndex, 
-          resumePosition: _initialResumePosition,
-          autoPlay: true, 
-        );
+        _handlePlayAction(_currentEpisodeIndex, resumePosition: _initialResumePosition);
         // 使用后清空初始进度，防止干扰手动切换
         _initialResumePosition = null;
       }
@@ -320,343 +303,36 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     }
   }
 
-    Future<void> _initializePlayer(String url, int index, {double? resumePosition, bool autoPlay = true}) async {
-
-      if (_isInitializing) return;
-
-      
-
-      _isInitializing = true;
-
-      if (mounted) setState(() {});
-
-  
-
-      try {
-
-        // 彻底销毁旧的控制器
-
-        final oldPlayer = _videoController;
-
-        final oldChewie = _chewieController;
-
-        _videoController = null;
-
-        _chewieController = null;
-
-        _isPlaying = false; // 重置播放状态
-
-        if (mounted) setState(() {});
-
-        
-
-        oldChewie?.dispose();
-
-        await oldPlayer?.dispose();
-
-        
-
-                await Future.delayed(const Duration(milliseconds: 300));
-
-        
-
-        
-
-        
-
-                if (!mounted) return;
-
-        
-
-        
-
-        
-
-                // 如果开启去广告，则通过本地代理处理 M3U8
-
-        
-
-                final playUrl = _isAdBlockingEnabled 
-
-        
-
-                    ? ref.read(adBlockServiceProvider).getProxyUrl(url) 
-
-        
-
-                    : url;
-
-        
-
-        
-
-        
-
-                final controller = VideoPlayerController.networkUrl(
-
-        
-
-                  Uri.parse(playUrl),
-
-        
-
-                  videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-
-          httpHeaders: {
-
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-
-            'Referer': url.startsWith('http') ? Uri.parse(url).origin : '',
-
-          },
-
-          formatHint: url.toLowerCase().contains('.m3u8') ? VideoFormat.hls : null,
-
-        );
-
-        _videoController = controller;
-
-  
-
-        controller.addListener(() {
-
-          if (!mounted || _videoController != controller) return;
-
-          
-
-          if (controller.value.hasError) {
-
-            final error = controller.value.errorDescription;
-
-            debugPrint('播放器运行时错误: $error');
-
-            _handlePlaybackFailure(url, index, resumePosition: controller.value.position.inSeconds.toDouble(), autoPlay: true);
-
-            return;
-
-          }
-
-  
-
-          if (!controller.value.isInitialized) return;
-
-          
-
-          if (mounted && _isPlaying != controller.value.isPlaying) {
-            setState(() {
-              _isPlaying = controller.value.isPlaying;
-            });
-          }
-
-          if (controller.value.isPlaying && controller.value.position.inSeconds % 5 == 0) _savePlayRecord();
-
-          
-
-          // Skip intro/outro logic
-
-          if (controller.value.isPlaying && _skipConfig.enable) {
-
-            final position = controller.value.position.inSeconds;
-
-            final duration = controller.value.duration.inSeconds;
-
-            
-
-            // Skip intro
-
-            if (_skipConfig.introTime > 0 && position < _skipConfig.introTime) {
-
-              controller.seekTo(Duration(seconds: _skipConfig.introTime));
-
-              debugPrint('已跳过片头: ${_skipConfig.introTime}s');
-
-            }
-
-            
-
-            // Skip outro
-
-            if (_skipConfig.outroTime > 0 && duration > 0 && position > (duration - _skipConfig.outroTime)) {
-
-               if (_autoPlayNext) {
-
-                 _playNextEpisode();
-
-               } else {
-
-                 controller.pause();
-
-               }
-
-               debugPrint('已跳过片尾: ${_skipConfig.outroTime}s');
-
-            }
-
-          }
-
-  
-
-          if (controller.value.position >= controller.value.duration && controller.value.duration > Duration.zero && !controller.value.isPlaying) {
-
-            if (_autoPlayNext) _playNextEpisode();
-
-          }
-
-        });
-
-  
-
-                                await controller.initialize().timeout(const Duration(seconds: 30));
-
-  
-
-                                
-
-  
-
-                                // 设置初始音量为全局记忆值
-
-  
-
-                                final globalVolume = ref.read(playerVolumeProvider);
-
-  
-
-                                await controller.setVolume(globalVolume);
-
-  
-
-                                
-
-  
-
-                                if (resumePosition != null && resumePosition > 1) {
-
-          await controller.seekTo(Duration(seconds: resumePosition.toInt()));
-
-        }
-
-  
-
-        if (mounted && _videoController == controller) {
-
-          _createChewieController(autoPlay: autoPlay);
-
-          _isInitializing = false; // 初始化成功
-
-          setState(() {
-
-            _currentEpisodeIndex = index;
-
-          });
-
-        }
-
-      } catch (e) {
-
-        debugPrint('播放器初始化失败: $e');
-
-        if (mounted) {
-
-          await _handlePlaybackFailure(url, index, resumePosition: resumePosition, autoPlay: autoPlay);
-
-        }
-
-      } finally {
-
-        if (mounted) {
-
-          _isInitializing = false;
-
-          if (mounted) setState(() {});
-
-        }
-
-      }
-
-    }
-
-  
-
-    /// 统一处理播放失败
-
-    Future<void> _handlePlaybackFailure(String url, int index, {double? resumePosition, bool autoPlay = true}) async {
-
-      if (!mounted) return;
-
-  
-
-      // 标记当前源为故障
-
-      final key = '${_currentSource?.source}-${_currentSource?.id}';
-
-      _qualityInfoMap[key] = VideoQualityInfo.error();
-
-      _scoreMap[key] = -1.0; 
-
-      
-
-      if (mounted) {
-
-        ScaffoldMessenger.of(context).showSnackBar(
-
-          const SnackBar(content: Text('当前线路连接失败，请尝试手动切换源站'), backgroundColor: Colors.redAccent)
-
-        );
-
-        setState(() {
-
-          _isInitializing = false;
-
-          _isPlaying = false;
-
-        });
-
-      }
-
-    }
-
-  void _createChewieController({bool autoPlay = true}) {
-    if (!mounted || _videoController == null) return;
-    _chewieController = ChewieController(
-      videoPlayerController: _videoController!,
-      autoPlay: autoPlay,
-      aspectRatio: _videoController!.value.aspectRatio,
-      allowFullScreen: true,
-      customControls: ZenVideoControls(
-        isAdBlockingEnabled: _isAdBlockingEnabled,
-        onAdBlockingToggle: () async {
-          final prefs = await SharedPreferences.getInstance();
-          setState(() {
-            _isAdBlockingEnabled = !_isAdBlockingEnabled;
-            prefs.setBool('enable_blockad', _isAdBlockingEnabled);
-          });
-          _handlePlayAction(_currentEpisodeIndex, resumePosition: _videoController?.value.position.inSeconds.toDouble());
-        },
-        skipConfig: _skipConfig,
-        onSkipConfigChange: (newConfig) async {
-          final key = '${_currentSource!.source}-${_currentSource!.id}';
-          await ref.read(configServiceProvider).saveSkipConfig(key, newConfig);
-          setState(() => _skipConfig = newConfig);
-        },
-        initialVolume: ref.read(playerVolumeProvider),
-        onVolumeChanged: (vol) {
-          ref.read(playerVolumeProvider.notifier).setVolume(vol);
-        },
-        hasNextEpisode: _currentSource != null && _currentEpisodeIndex < _currentSource!.playGroups.first.urls.length - 1,
-        onNextEpisode: _playNextEpisode,
-      ),
-      materialProgressColors: ChewieProgressColors(
-        playedColor: Theme.of(context).primaryColor,
-        handleColor: Theme.of(context).primaryColor,
-      ),
-    );
-    _isPlaying = autoPlay;
-    if (autoPlay) _savePlayRecord();
+  void _handlePlayAction(int index, {double? resumePosition}) {
+    if (_currentSource == null) return;
+    _initialResumePosition = resumePosition;
+    setState(() {
+      _currentEpisodeIndex = index;
+    });
   }
 
-  Future<void> _savePlayRecord() async {
-    if (_currentSource == null || _videoController == null) return;
+  Future<void> _switchSource(VideoDetail newSource) async {
+    setState(() {
+      _currentSource = newSource;
+    });
+    _loadSkipConfig();
+    final targetIndex = _currentEpisodeIndex >= newSource.playGroups.first.urls.length ? 0 : _currentEpisodeIndex;
+    _handlePlayAction(targetIndex);
+  }
+
+  void _playNextEpisode() {
+    if (_currentSource == null) return;
+    final nextIndex = _currentEpisodeIndex + 1;
+    if (nextIndex < _currentSource!.playGroups.first.urls.length) {
+      _handlePlayAction(nextIndex);
+    }
+  }
+
+  Future<void> _savePlayRecord(Duration position, Duration duration) async {
+    if (_currentSource == null) return;
+    // 每 5 秒保存一次
+    if (position.inSeconds % 5 != 0) return;
+    
     final record = PlayRecord(
       title: widget.subject.title,
       sourceName: _currentSource!.sourceName,
@@ -664,8 +340,8 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       year: widget.subject.year ?? '',
       index: _currentEpisodeIndex,
       totalEpisodes: _currentSource!.playGroups.first.urls.length,
-      playTime: _videoController!.value.position.inSeconds,
-      totalTime: _videoController!.value.duration.inSeconds,
+      playTime: position.inSeconds,
+      totalTime: duration.inSeconds,
       saveTime: DateTime.now().millisecondsSinceEpoch,
       searchTitle: widget.subject.title,
       doubanId: _doubanId,
@@ -673,67 +349,17 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     ref.read(historyProvider.notifier).saveRecord(record);
   }
 
-  void _playNextEpisode() {
-    if (_currentSource == null) return;
-    final nextIndex = _currentEpisodeIndex + 1;
-    if (nextIndex < _currentSource!.playGroups.first.urls.length) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('即将播放：${_currentSource!.playGroups.first.titles[nextIndex]}'), behavior: SnackBarBehavior.floating));
-      _handlePlayAction(nextIndex);
-    }
-  }
-
-  void _playPreviousEpisode() {
-    if (_currentSource == null) return;
-    final prevIndex = _currentEpisodeIndex - 1;
-    if (prevIndex >= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('即将播放：${_currentSource!.playGroups.first.titles[prevIndex]}'), behavior: SnackBarBehavior.floating));
-      _handlePlayAction(prevIndex);
-    }
-  }
-
-  void _handlePlayAction(int index, {double? resumePosition}) {
-    if (_currentSource == null) return;
-    // 手动操作，清除初始恢复进度
-    _initialResumePosition = null;
-    _initializePlayer(_currentSource!.playGroups.first.urls[index], index, resumePosition: resumePosition, autoPlay: true);
-  }
-
-  Future<void> _switchSource(VideoDetail newSource) async {
-    // 手动操作，清除初始恢复进度
-    _initialResumePosition = null;
-    final oldPlayPosition = _videoController?.value.position.inSeconds.toDouble() ?? 0.0;
-    setState(() {
-      _currentSource = newSource;
-      // 不要在这里设置 _isInitializing = true，因为 _initializePlayer 内部会处理并检查它
-    });
-    _loadSkipConfig();
-    final targetIndex = _currentEpisodeIndex >= newSource.playGroups.first.urls.length ? 0 : _currentEpisodeIndex;
-    _initializePlayer(newSource.playGroups.first.urls[targetIndex], targetIndex, resumePosition: oldPlayPosition, autoPlay: _isPlaying);
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
-    _videoController?.dispose();
-    _chewieController?.dispose();
-    WakelockPlus.disable();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      // 切到后台：仅暂停并强制保存一次进度，不销毁实例
-      _videoController?.pause();
-      _savePlayRecord();
-    } else if (state == AppLifecycleState.detached) {
-      // 彻底断开（如热重启）：销毁所有资源
-      _videoController?.dispose();
-      _videoController = null;
-      _chewieController?.dispose();
-      _chewieController = null;
-      _isPlaying = false;
+      // 这里的进度保存由 EchoVideoPlayer 的 onProgress 持续进行
     }
     if (mounted) setState(() {});
   }
@@ -840,38 +466,48 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   }
 
   Widget _buildVideoPlayer(ThemeData theme, bool isPC) {
-    final bool hasError = !_isSearching && _currentSource != null && _chewieController == null && !_isOptimizing && !_isInitializing;
-    final content = _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
-        ? Chewie(controller: _chewieController!)
-        : Stack(
-            children: [
-              Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
-              Container(color: Colors.black.withValues(alpha: 0.6)),
-              Center(
-                child: hasError
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(LucideIcons.alertCircle, color: Colors.white60, size: 40),
-                          const SizedBox(height: 12),
-                          const Text('播放失败，请切换源站', style: TextStyle(color: Colors.white70)),
-                          TextButton(onPressed: () => _switchSource(_currentSource!), child: const Text('重试')),
-                        ],
-                      )
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(color: Colors.white),
-                          const SizedBox(height: 16),
-                          Text(
-                            _loadingMessage,
-                            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
-          );
+    Widget content;
+    
+    if (_currentSource == null) {
+      content = Stack(
+        children: [
+          Positioned.fill(child: CoverImage(imageUrl: widget.subject.cover)),
+          Container(color: Colors.black.withValues(alpha: 0.6)),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Colors.white),
+                const SizedBox(height: 16),
+                Text(
+                  _loadingMessage,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      final url = _currentSource!.playGroups.first.urls[_currentEpisodeIndex];
+      content = EchoVideoPlayer(
+        key: ValueKey(url),
+        url: url,
+        title: '${widget.subject.title} - ${_currentSource!.playGroups.first.titles[_currentEpisodeIndex]}',
+        referer: url.startsWith('http') ? Uri.parse(url).origin : '',
+        initialPosition: _initialResumePosition,
+        skipConfig: _skipConfig,
+        onSkipConfigChange: (newConfig) async {
+          final key = '${_currentSource!.source}-${_currentSource!.id}';
+          await ref.read(configServiceProvider).saveSkipConfig(key, newConfig);
+          setState(() => _skipConfig = newConfig);
+        },
+        hasNextEpisode: _currentEpisodeIndex < _currentSource!.playGroups.first.urls.length - 1,
+        onNextEpisode: _playNextEpisode,
+        onProgress: (pos) => _savePlayRecord(pos, const Duration(seconds: 0)), // duration 在 savePlayRecord 内部暂不使用或由 player 处理
+        onEnded: _autoPlayNext ? _playNextEpisode : null,
+      );
+    }
 
     final playerContainer = Container(
       height: isPC ? _calculatePlayerHeight(MediaQuery.of(context).size.width) : null,
@@ -1114,13 +750,13 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
                   runSpacing: 10,
                   children: List.generate(group.urls.length, (i) {
                     final index = _descending ? (group.urls.length - 1 - i) : i;
-                    final isCurrent = _currentEpisodeIndex == index && (_chewieController != null || _isInitializing);
+                    final isCurrent = _currentEpisodeIndex == index;
                     final title = group.titles[index];
                     
                     return GestureDetector(
-                      onTap: _isInitializing ? null : () => _handlePlayAction(index),
+                      onTap: () => _handlePlayAction(index),
                       child: MouseRegion(
-                        cursor: _isInitializing ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                        cursor: SystemMouseCursors.click,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1147,15 +783,6 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
             ),
           ],
         ),
-        if (_isInitializing)
-          Positioned.fill(
-            child: Container(
-              color: theme.colorScheme.surface.withValues(alpha: 0.5),
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          ),
       ],
     );
   }

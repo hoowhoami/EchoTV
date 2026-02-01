@@ -102,29 +102,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     value: _getImageProxyLabel(_doubanImageProxy),
                     onTap: () => _showImageProxyPicker(),
                   ),
-                  _buildSwitchItem(
+                  _buildNavigationItem(
                     icon: LucideIcons.userCheck,
                     title: '青少年模式',
-                    value: ref.watch(teenageModeProvider),
-                    onChanged: (val) => ref.read(teenageModeProvider.notifier).setEnabled(val),
+                    onTap: () => _pushPage(const TeenageModeSettingsPage()),
                   ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (Widget child, Animation<double> animation) {
-                      return FadeTransition(
-                        opacity: animation,
-                        child: SizeTransition(sizeFactor: animation, axisAlignment: -1.0, child: child),
-                      );
-                    },
-                    child: ref.watch(teenageModeProvider)
-                        ? _buildNavigationItem(
-                            key: const ValueKey('keywords_editor'),
-                            icon: LucideIcons.filter,
-                            title: '过滤关键字管理',
-                            showDivider: false,
-                            onTap: () => _showKeywordsEditor(),
-                          )
-                        : const SizedBox.shrink(key: ValueKey('empty')),
+                  _buildNavigationItem(
+                    icon: LucideIcons.shieldCheck,
+                    title: '广告拦截',
+                    showDivider: false,
+                    onTap: () => _pushPage(const AdBlockSettingsPage()),
                   ),
                 ]),
 
@@ -455,6 +442,174 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  void _showAdBlockMenu() {
+    final theme = Theme.of(context);
+    final isAdBlockEnabled = ref.watch(adBlockEnabledProvider);
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('广告拦截设置', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 24),
+            _buildSwitchItem(
+              icon: LucideIcons.shield,
+              title: '开启广告拦截',
+              value: isAdBlockEnabled,
+              onChanged: (val) => ref.read(adBlockEnabledProvider.notifier).setEnabled(val),
+            ),
+            _buildNavigationItem(
+              icon: LucideIcons.shieldAlert,
+              title: '黑名单关键字',
+              onTap: () {
+                Navigator.pop(context);
+                _showAdBlockKeywordsEditor();
+              },
+            ),
+            _buildNavigationItem(
+              icon: LucideIcons.shieldCheck,
+              title: '白名单关键字',
+              showDivider: false,
+              onTap: () {
+                Navigator.pop(context);
+                _showAdBlockWhitelistEditor();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAdBlockKeywordsEditor() {
+    final keywords = ref.read(adBlockKeywordsProvider);
+    final controller = TextEditingController(text: keywords.join(', '));
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('广告拦截黑名单', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '输入广告特征关键字，用逗号分隔...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '提示：包含这些关键字的视频分片将被拦截。建议仅在正片中夹杂小广告时使用。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
+            ),
+          ],
+        ),
+        actions: [
+          ZenButton(
+            isSecondary: true,
+            onPressed: () {
+              ref.read(adBlockKeywordsProvider.notifier).setKeywords(ConfigService.defaultAdKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('恢复默认'),
+          ),
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
+            onPressed: () {
+              final newKeywords = controller.text
+                  .split(RegExp(r'[,，]'))
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              ref.read(adBlockKeywordsProvider.notifier).setKeywords(newKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAdBlockWhitelistEditor() {
+    final keywords = ref.read(adBlockWhitelistProvider);
+    final controller = TextEditingController(text: keywords.join(', '));
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('广告拦截白名单', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '输入正片特征关键字（如分辨率），用逗号分隔...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '提示：包含这些特征的 URL 将永远不会被作为广告拦截，用于修复误杀。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
+            ),
+          ],
+        ),
+        actions: [
+          ZenButton(
+            isSecondary: true,
+            onPressed: () {
+              ref.read(adBlockWhitelistProvider.notifier).setKeywords(ConfigService.defaultAdWhitelist);
+              Navigator.pop(context);
+            },
+            child: const Text('恢复默认'),
+          ),
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
+            onPressed: () {
+              final newKeywords = controller.text
+                  .split(RegExp(r'[,，]'))
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              ref.read(adBlockWhitelistProvider.notifier).setKeywords(newKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSimplePicker(String title, Map<dynamic, String> options, dynamic currentVal, Function(dynamic) onSelect) {
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -652,6 +807,519 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               exit(0); // 清除后退出，确保下次启动重新加载
             },
             child: const Text('确认清除并退出'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TeenageModeSettingsPage extends ConsumerWidget {
+  const TeenageModeSettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+    final theme = Theme.of(context);
+    final isTeenageMode = ref.watch(teenageModeProvider);
+
+    return ZenScaffold(
+      body: CustomScrollView(
+        slivers: [
+          const ZenSliverAppBar(
+            title: '青少年模式',
+            subtitle: '为未成年人提供健康的观影环境',
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildSettingGroup(context, [
+                  _buildSwitchItem(
+                    context,
+                    icon: LucideIcons.userCheck,
+                    title: '开启青少年模式',
+                    value: isTeenageMode,
+                    onChanged: (val) => ref.read(teenageModeProvider.notifier).setEnabled(val),
+                  ),
+                  _buildNavigationItem(
+                    context,
+                    icon: LucideIcons.filter,
+                    title: '内容过滤关键字',
+                    showDivider: false,
+                    onTap: () => _showKeywordsEditor(context, ref),
+                  ),
+                ]),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '模式说明：',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '1. 开启后，系统将根据设置的关键字自动过滤搜索结果和分类列表。\n'
+                        '2. 建议家长根据实际情况调整过滤关键字。\n'
+                        '3. 本功能通过本地算法实现，无法保证 100% 过滤，请配合监护使用。',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.secondary.withValues(alpha: 0.6),
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingGroup(BuildContext context, List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildNavigationItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool showDivider = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  Icon(LucideIcons.chevronRight, size: 16, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
+                ],
+              ),
+            ),
+            if (showDivider)
+              Divider(
+                height: 1,
+                indent: 52,
+                endIndent: 0,
+                color: Theme.of(context).dividerColor,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required bool value,
+    required Function(bool) onChanged,
+    bool showDivider = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                ZenSwitch(
+                  value: value,
+                  onChanged: onChanged,
+                ),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Divider(
+              height: 1,
+              indent: 52,
+              endIndent: 0,
+              color: Theme.of(context).dividerColor,
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showKeywordsEditor(BuildContext context, WidgetRef ref) {
+    final keywords = ref.read(filteredKeywordsProvider);
+    final controller = TextEditingController(text: keywords.join(', '));
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('过滤关键字管理', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '输入关键字，用逗号分隔...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '提示：关键字之间使用中文或英文逗号分隔。开启青少年模式后，包含这些词的资源将被过滤。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
+            ),
+          ],
+        ),
+        actions: [
+          ZenButton(
+            isSecondary: true,
+            onPressed: () {
+              ref.read(filteredKeywordsProvider.notifier).setKeywords(ConfigService.defaultKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('恢复默认'),
+          ),
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
+            onPressed: () {
+              final newKeywords = controller.text
+                  .split(RegExp(r'[,，]'))
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              ref.read(filteredKeywordsProvider.notifier).setKeywords(newKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdBlockSettingsPage extends ConsumerWidget {
+  const AdBlockSettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPC = screenWidth > 800;
+    final horizontalPadding = isPC ? 48.0 : 24.0;
+    final theme = Theme.of(context);
+
+    return ZenScaffold(
+      body: CustomScrollView(
+        slivers: [
+          const ZenSliverAppBar(
+            title: '广告拦截设置',
+            subtitle: '精细化管理视频流过滤规则',
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildSettingGroup(context, [
+                  _buildSwitchItem(
+                    context,
+                    icon: LucideIcons.shield,
+                    title: '开启广告拦截',
+                    value: ref.watch(adBlockEnabledProvider),
+                    onChanged: (val) => ref.read(adBlockEnabledProvider.notifier).setEnabled(val),
+                  ),
+                  _buildNavigationItem(
+                    context,
+                    icon: LucideIcons.shieldAlert,
+                    title: '黑名单关键字管理',
+                    onTap: () => _showAdBlockKeywordsEditor(context, ref),
+                  ),
+                  _buildNavigationItem(
+                    context,
+                    icon: LucideIcons.shieldCheck,
+                    title: '白名单关键字管理',
+                    showDivider: false,
+                    onTap: () => _showAdBlockWhitelistEditor(context, ref),
+                  ),
+                ]),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    '提示：广告拦截主要针对 M3U8 格式的视频流。如果某些视频由于拦截逻辑无法播放，请尝试添加白名单或暂时关闭此功能。',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.6),
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingGroup(BuildContext context, List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildNavigationItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool showDivider = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  Icon(LucideIcons.chevronRight, size: 16, color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5)),
+                ],
+              ),
+            ),
+            if (showDivider)
+              Divider(
+                height: 1,
+                indent: 52,
+                endIndent: 0,
+                color: Theme.of(context).dividerColor,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSwitchItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required bool value,
+    required Function(bool) onChanged,
+    bool showDivider = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                ZenSwitch(
+                  value: value,
+                  onChanged: onChanged,
+                ),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Divider(
+              height: 1,
+              indent: 52,
+              endIndent: 0,
+              color: Theme.of(context).dividerColor,
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showAdBlockKeywordsEditor(BuildContext context, WidgetRef ref) {
+    final keywords = ref.read(adBlockKeywordsProvider);
+    final controller = TextEditingController(text: keywords.join(', '));
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('广告拦截黑名单', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '输入广告特征关键字，用逗号分隔...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '提示：包含这些关键字的视频分片将被拦截。建议仅在正片中夹杂小广告时使用。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
+            ),
+          ],
+        ),
+        actions: [
+          ZenButton(
+            isSecondary: true,
+            onPressed: () {
+              ref.read(adBlockKeywordsProvider.notifier).setKeywords(ConfigService.defaultAdKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('恢复默认'),
+          ),
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
+            onPressed: () {
+              final newKeywords = controller.text
+                  .split(RegExp(r'[,，]'))
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              ref.read(adBlockKeywordsProvider.notifier).setKeywords(newKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAdBlockWhitelistEditor(BuildContext context, WidgetRef ref) {
+    final keywords = ref.read(adBlockWhitelistProvider);
+    final controller = TextEditingController(text: keywords.join(', '));
+
+    showDialog(
+      context: context,
+      builder: (context) => EditDialog(
+        title: const Text('广告拦截白名单', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '输入正片特征关键字（如分辨率），用逗号分隔...',
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '提示：包含这些特征的 URL 将永远不会被作为广告拦截，用于修复误杀。',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
+            ),
+          ],
+        ),
+        actions: [
+          ZenButton(
+            isSecondary: true,
+            onPressed: () {
+              ref.read(adBlockWhitelistProvider.notifier).setKeywords(ConfigService.defaultAdWhitelist);
+              Navigator.pop(context);
+            },
+            child: const Text('恢复默认'),
+          ),
+          ZenButton(
+            isSecondary: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ZenButton(
+            onPressed: () {
+              final newKeywords = controller.text
+                  .split(RegExp(r'[,，]'))
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              ref.read(adBlockWhitelistProvider.notifier).setKeywords(newKeywords);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
           ),
         ],
       ),

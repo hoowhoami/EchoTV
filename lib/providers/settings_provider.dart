@@ -108,3 +108,66 @@ class PlayerVolumeModel extends Notifier<double> {
     await configService.setPlayerVolume(volume);
   }
 }
+
+final adBlockEnabledProvider = NotifierProvider<AdBlockEnabledModel, bool>(AdBlockEnabledModel.new);
+
+class AdBlockEnabledModel extends Notifier<bool> {
+  @override
+  bool build() {
+    _load();
+    return true;
+  }
+
+  Future<void> _load() async {
+    final configService = ref.read(configServiceProvider);
+    state = await configService.getAdBlockEnabled();
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    final configService = ref.read(configServiceProvider);
+    await configService.setAdBlockEnabled(enabled);
+  }
+}
+
+final adBlockKeywordsProvider = NotifierProvider<AdBlockKeywordsModel, List<String>>(AdBlockKeywordsModel.new);
+
+class AdBlockKeywordsModel extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    _load();
+    return ConfigService.defaultAdKeywords;
+  }
+
+  Future<void> _load() async {
+    final configService = ref.read(configServiceProvider);
+    state = await configService.getAdBlockKeywords();
+  }
+
+  Future<void> setKeywords(List<String> keywords) async {
+    state = keywords;
+    final configService = ref.read(configServiceProvider);
+    await configService.setAdBlockKeywords(keywords);
+  }
+}
+
+final adBlockWhitelistProvider = NotifierProvider<AdBlockWhitelistModel, List<String>>(AdBlockWhitelistModel.new);
+
+class AdBlockWhitelistModel extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    _load();
+    return ConfigService.defaultAdWhitelist;
+  }
+
+  Future<void> _load() async {
+    final configService = ref.read(configServiceProvider);
+    state = await configService.getAdBlockWhitelist();
+  }
+
+  Future<void> setKeywords(List<String> keywords) async {
+    state = keywords;
+    final configService = ref.read(configServiceProvider);
+    await configService.setAdBlockWhitelist(keywords);
+  }
+}
