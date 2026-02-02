@@ -18,9 +18,9 @@ class AdBlockService {
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 15),
-    validateStatus: (status) => true, // 允许抓取 4xx/5xx 响应，避免抛出异常导致代理崩溃
+    validateStatus: (status) => true,
     headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
     },
   ));
 
@@ -215,29 +215,42 @@ class AdBlockService {
               : segmentUri.host;
 
           bool isAd = false;
+          String filterReason = '';
           
           // --- 白名单检测：如果包含正片特征，直接放行 ---
           bool isWhitelisted = contentKeywords.any((kw) => absoluteUrl.toLowerCase().contains(kw));
 
           if (!isWhitelisted) {
             // 判定逻辑 A: 显式黑名单 (最高优先级)
-            if (adKeywords.any((kw) => absoluteUrl.toLowerCase().contains(kw))) {
-              isAd = true;
+            for (var kw in adKeywords) {
+              if (absoluteUrl.toLowerCase().contains(kw)) {
+                // 特殊处理：如果是 'ads' 这种通用词，且分片域名与主站一致，则不判定为广告
+                if (kw == 'ads' && (segmentRootHost == mainRootHost || segmentUri.host.contains(baseUri.host))) {
+                  continue;
+                }
+                isAd = true;
+                filterReason = 'Keyword: $kw';
+                break;
+              }
             }
             
-            // 判定逻辑 B: 域名/时长组合特征
-            if (segmentRootHost != mainRootHost && !segmentUri.host.contains(baseUri.host) && duration < 4.5) {
-              isAd = true;
-            }
+            if (!isAd) {
+              // 判定逻辑 B: 域名/时长组合特征 (跨域且极短)
+              if (segmentRootHost != mainRootHost && !segmentUri.host.contains(baseUri.host) && duration < 5.0) {
+                isAd = true;
+                filterReason = 'Cross-domain & Short (${duration}s)';
+              }
 
-            // 判定逻辑 C: 采集站典型的 Pre-roll 广告 (前 5 片且域名偏移且时长短)
-            if (segmentCount <= 5 && duration < 4.0 && segmentRootHost != mainRootHost) {
-              isAd = true;
+              // 判定逻辑 C: 采集站典型的 Pre-roll 广告 (前 5 片且域名偏移且时长短)
+              if (!isAd && segmentCount <= 5 && duration < 4.0 && segmentRootHost != mainRootHost) {
+                isAd = true;
+                filterReason = 'Pre-roll feature (${duration}s)';
+              }
             }
           }
 
           if (isAd) {
-            debugPrint('🚫 AdBlock: Filtered ad segment (${duration}s) -> $absoluteUrl');
+            debugPrint('🚫 AdBlock: [$filterReason] Filtered segment -> $absoluteUrl');
             i = urlIndex;
             continue;
           }

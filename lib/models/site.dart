@@ -70,6 +70,17 @@ class VideoDetail {
     this.desc,
     this.typeName,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VideoDetail &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          source == other.source;
+
+  @override
+  int get hashCode => id.hashCode ^ source.hashCode;
 }
 
 // ... CustomCategory, PlayRecord, Favorite 保持不变 ...

@@ -177,52 +177,38 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       _noSitesConfigured = false;
     });
 
+    final Set<String> processedKeys = {};
+    
     await for (final results in cmsService.searchAllStream(activeSites, widget.subject.title)) {
       if (!mounted) break;
 
-      final List<VideoDetail> filtered = [];
-      final seenKeys = <String>{};
+      final List<VideoDetail> newlyFound = [];
       
       for (var res in results) {
         final sTitle = res.title.replaceAll(' ', '').toLowerCase();
         final tTitle = widget.subject.title.replaceAll(' ', '').toLowerCase();
         if (sTitle.contains(tTitle) || tTitle.contains(sTitle)) {
           final key = '${res.source}-${res.id}';
-          if (!seenKeys.contains(key)) {
-            seenKeys.add(key);
-            filtered.add(res);
+          if (!processedKeys.contains(key)) {
+            processedKeys.add(key);
+            newlyFound.add(res);
           }
         }
       }
 
-      if (mounted) {
+      if (mounted && newlyFound.isNotEmpty) {
         setState(() {
-          _availableSources = filtered;
-          // 兜底逻辑：如果豆瓣没抓到描述，且已经有了资源结果，使用第一个有描述的资源的详情
-          if ((_fullSubject?.description == null || _fullSubject!.description!.isEmpty) && filtered.isNotEmpty) {
-            final firstWithDesc = filtered.firstWhere((e) => e.desc != null && e.desc!.isNotEmpty, orElse: () => filtered.first);
-            if (firstWithDesc.desc != null && firstWithDesc.desc!.isNotEmpty) {
-              _fullSubject = DoubanSubject(
-                id: _doubanId,
-                title: widget.subject.title,
-                rate: widget.subject.rate,
-                cover: widget.subject.cover,
-                year: widget.subject.year,
-                description: firstWithDesc.desc,
-              );
-              _isDetailLoading = false;
-            }
-          }
+          _availableSources.addAll(newlyFound);
+          _noSitesConfigured = false;
         });
-        
-        // 核心改变：启动动态初始化监测
-        if (!_hasTriggeredInitialInit && filtered.isNotEmpty) {
+
+        if (!_hasTriggeredInitialInit) {
           _hasTriggeredInitialInit = true;
           _startDynamicInitialization();
         }
 
-        if (filtered.isNotEmpty && !_isOptimizing) {
-          _optimizeBestSource(filtered);
+        if (!_isOptimizing) {
+          _optimizeBestSource(newlyFound);
         }
       }
     }
@@ -260,17 +246,20 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       final result = await optimizer.selectBestSource(_availableSources, cachedQualityInfo: _qualityInfoMap);
       
       if (mounted) {
+        VideoDetail best = result.bestSource;
         setState(() {
-          _currentSource = result.bestSource;
+          _currentSource = best;
           _qualityInfoMap.addAll(result.qualityInfoMap);
           _scoreMap.addAll(result.scoreMap);
           _loadingStage = LoadingStage.fetching;
           _loadingMessage = '🎬 正在准备播放...';
         });
+
+        // 异步抓取更完整的详情（如完整播放列表），不阻塞 UI 但确保播放前数据最新
+        await _fetchFullDetail(best);
         
         _loadSkipConfig();
         _handlePlayAction(_currentEpisodeIndex, resumePosition: _initialResumePosition);
-        // 使用后清空初始进度，防止干扰手动切换
         _initialResumePosition = null;
       }
     }
@@ -334,9 +323,32 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     setState(() {
       _currentSource = newSource;
     });
+    
+    // 异步尝试获取更完整的详情（如播放列表），不阻塞主线程切换
+    _fetchFullDetail(newSource);
+
     _loadSkipConfig();
     final targetIndex = _currentEpisodeIndex >= newSource.playGroups.first.urls.length ? 0 : _currentEpisodeIndex;
     _handlePlayAction(targetIndex);
+  }
+
+  Future<void> _fetchFullDetail(VideoDetail source) async {
+    try {
+      final cmsService = ref.read(cmsServiceProvider);
+      final configService = ref.read(configServiceProvider);
+      final activeSites = await configService.getSites();
+      final site = activeSites.firstWhere((s) => s.key == source.source);
+      
+      final fullDetail = await cmsService.getDetail(site, source.id);
+      if (fullDetail != null && mounted && _currentSource?.id == source.id) {
+        setState(() {
+          _currentSource = fullDetail;
+          // 同步更新缓存列表
+          final idx = _availableSources.indexWhere((s) => s.id == source.id && s.source == source.source);
+          if (idx != -1) _availableSources[idx] = fullDetail;
+        });
+      }
+    } catch (_) {}
   }
 
   void _playNextEpisode() {
@@ -515,7 +527,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         key: _playerKey,
         url: url,
         title: '${widget.subject.title} - ${_currentSource!.playGroups.first.titles[_currentEpisodeIndex]}',
-        referer: url.startsWith('http') ? Uri.parse(url).origin : '',
+        referer: '', // 移除自动生成的 Origin Referer，避免触发防盗链
         initialPosition: _initialResumePosition,
         skipConfig: _skipConfig,
         onSkipConfigChange: (newConfig) async {

@@ -37,7 +37,8 @@ class ConfigService {
 
   static const List<String> defaultAdKeywords = [
     'ads', 'union', 'click', 'p6p', 'pop', 'short.mp4', 'advert', 'adv.', 
-    'guanggao', 'miaopai', '666216.com', 'v.it608.com', 'ovscic'
+    'guanggao', 'miaopai', '666216.com', 'v.it608.com', 'ovscic',
+    '888216.com', '999216.com', '661216.com'
   ];
 
   static const List<String> defaultAdWhitelist = [
