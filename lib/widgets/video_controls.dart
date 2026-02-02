@@ -52,6 +52,15 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   IconData _hintIcon = LucideIcons.play;
   final double _barHeight = 36.0;
   
+  // Gesture states
+  double _brightness = 0.5;
+  bool _isDragging = false;
+  Offset _dragStartOffset = Offset.zero;
+  double _dragStartVolume = 0.0;
+  double _dragStartBrightness = 0.0;
+  Duration _dragStartPosition = Duration.zero;
+  String _dragHintType = ''; // 'volume', 'brightness', 'seek'
+
   late SkipConfig _localSkipConfig;
   
   ChewieController? _chewieController;
@@ -63,6 +72,15 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     _localSkipConfig = widget.skipConfig;
     _lastVolume = widget.initialVolume;
     windowManager.addListener(this);
+    _initBrightness();
+  }
+
+  Future<void> _initBrightness() async {
+    if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+      // Desktop brightness handled by window manager or system
+    }
+    // For mobile, we'd need a plugin like screen_brightness. 
+    // For now we'll just track it locally for the UI hint.
   }
 
   @override
@@ -130,16 +148,18 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     });
   }
 
-  void _showActionHint(String text, IconData icon) {
+  void _showActionHint(String text, IconData icon, {bool autoHide = true}) {
     _hintTimer?.cancel();
     setState(() {
       _hintText = text;
       _hintIcon = icon;
       _showHint = true;
     });
-    _hintTimer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() => _showHint = false);
-    });
+    if (autoHide) {
+      _hintTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _showHint = false);
+      });
+    }
   }
 
   void _handleKeyEvent(KeyEvent event) {
@@ -189,7 +209,20 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   @override
   Widget build(BuildContext context) {
     if (_latestValue?.hasError ?? false) {
-      return const Center(child: Icon(LucideIcons.alertCircle, color: Colors.white, size: 32));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.alertCircle, color: Colors.white70, size: 32),
+            const SizedBox(height: 12),
+            const Text('播放出错', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            TextButton(
+              onPressed: () => _videoPlayerController?.initialize(),
+              child: const Text('点击重试', style: TextStyle(color: Colors.white, fontSize: 12)),
+            ),
+          ],
+        ),
+      );
     }
 
     return KeyboardListener(
@@ -477,10 +510,10 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
               onTap: () {
                 if (_chewieController?.isFullScreen ?? false) {
                   _chewieController?.exitFullScreen();
-                  // 仅在移动端作为备选方案执行 maybePop
+                  // 针对部分机型 exitFullScreen 不触发路由返回的补丁
                   if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      if (context.mounted && Navigator.of(context).canPop()) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (context.mounted && (_chewieController?.isFullScreen ?? false)) {
                         Navigator.of(context).maybePop();
                       }
                     });
@@ -492,6 +525,13 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
               child: _buildIconBtn(LucideIcons.chevronLeft, () {
                 if (_chewieController?.isFullScreen ?? false) {
                   _chewieController?.exitFullScreen();
+                  if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+                    Future.delayed(const Duration(milliseconds: 300), () {
+                      if (context.mounted && (_chewieController?.isFullScreen ?? false)) {
+                        Navigator.of(context).maybePop();
+                      }
+                    });
+                  }
                 } else {
                   Navigator.of(context).maybePop();
                 }
@@ -651,6 +691,71 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     );
   }
 
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    if (_videoPlayerController == null || _isLocked) return;
+    
+    final width = MediaQuery.of(context).size.width;
+    final delta = -details.primaryDelta! / 200; // 灵敏度调节
+    
+    _isDragging = true;
+    if (_dragStartOffset.dx < width * 0.35) { // 增加判定范围
+      // 左侧：亮度
+      _dragHintType = 'brightness';
+      _dragStartBrightness = (_dragStartBrightness + delta).clamp(0.0, 1.0);
+      _brightness = _dragStartBrightness;
+      _showActionHint('亮度: ${(_brightness * 100).toInt()}%', LucideIcons.sun, autoHide: false);
+    } else if (_dragStartOffset.dx > width * 0.65) {
+      // 右侧：音量
+      _dragHintType = 'volume';
+      _dragStartVolume = (_dragStartVolume + delta).clamp(0.0, 1.0);
+      _videoPlayerController!.setVolume(_dragStartVolume);
+      if (_dragStartVolume > 0) _lastVolume = _dragStartVolume;
+      _showActionHint('音量: ${(_dragStartVolume * 100).toInt()}%', _dragStartVolume == 0 ? LucideIcons.volumeX : (_dragStartVolume < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2), autoHide: false);
+    }
+  }
+
+  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
+    if (_videoPlayerController == null || _isLocked) return;
+    
+    final width = MediaQuery.of(context).size.width;
+    final totalDuration = _videoPlayerController!.value.duration;
+    if (totalDuration == Duration.zero) return;
+
+    final delta = details.primaryDelta! / width * totalDuration.inSeconds * 0.5; // 灵敏度
+    
+    _isDragging = true;
+    _dragHintType = 'seek';
+    final newSeconds = (_dragStartPosition.inSeconds + delta).clamp(0.0, totalDuration.inSeconds.toDouble());
+    final newPosition = Duration(seconds: newSeconds.toInt());
+    _dragStartPosition = newPosition;
+    
+    final isForward = delta > 0;
+    _showActionHint(
+      '进度: ${_formatDuration(newPosition)} / ${_formatDuration(totalDuration)}', 
+      isForward ? LucideIcons.fastForward : LucideIcons.rewind,
+      autoHide: false
+    );
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    if (!_isDragging || _isLocked) return;
+    
+    if (_dragHintType == 'seek' && _videoPlayerController != null) {
+      _videoPlayerController!.seekTo(_dragStartPosition);
+    }
+    
+    setState(() {
+      _isDragging = false;
+      _dragHintType = '';
+      // 拖动结束，800ms 后隐藏提示
+      _hintTimer?.cancel();
+      _hintTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _showHint = false);
+      });
+    });
+    _cancelAndRestartTimer();
+  }
+
   Widget _buildHitArea() {
     return GestureDetector(
       onTap: () {
@@ -665,6 +770,31 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
           _cancelAndRestartTimer();
         }
       },
+      onDoubleTap: () {
+        if (_isLocked || _videoPlayerController == null) return;
+        if (_videoPlayerController!.value.isPlaying) {
+          _videoPlayerController!.pause();
+          _showActionHint('已暂停', LucideIcons.pause);
+        } else {
+          _videoPlayerController!.play();
+          _showActionHint('已播放', LucideIcons.play);
+        }
+        _cancelAndRestartTimer();
+      },
+      onVerticalDragStart: (details) {
+        if (_isLocked) return;
+        _dragStartOffset = details.localPosition;
+        _dragStartVolume = _videoPlayerController?.value.volume ?? 0.0;
+        _dragStartBrightness = _brightness;
+      },
+      onVerticalDragUpdate: _handleVerticalDragUpdate,
+      onVerticalDragEnd: _handleDragEnd,
+      onHorizontalDragStart: (details) {
+        if (_isLocked) return;
+        _dragStartPosition = _videoPlayerController?.value.position ?? Duration.zero;
+      },
+      onHorizontalDragUpdate: _handleHorizontalDragUpdate,
+      onHorizontalDragEnd: _handleDragEnd,
       child: Container(color: Colors.transparent),
     );
   }

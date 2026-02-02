@@ -46,6 +46,7 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
   ChewieController? _chewieController;
   bool _isInitializing = false;
   bool _isDisposed = false;
+  String? _errorMessage;
 
   @override
   bool get wantKeepAlive => true;
@@ -67,8 +68,11 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
   }
 
   Future<void> _initializePlayer() async {
-    if (_isInitializing || _isDisposed) return;
-    setState(() => _isInitializing = true);
+    if (_isDisposed) return;
+    setState(() {
+      _isInitializing = true;
+      _errorMessage = null;
+    });
 
     try {
       final oldVideoController = _videoController;
@@ -99,7 +103,6 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
           : widget.url;
 
       // 3. 判定是否给播放器 HLS 格式提示
-      // 如果链接含 .m3u8，或者被标记为直播且没有明显的其它视频后缀（兼容 PHP 动态流），则给 HLS 提示
       bool useHlsHint = isM3u8;
       if (widget.isLive && !isM3u8) {
         final otherExtensions = ['.mp4', '.mov', '.mpd', '.mkv', '.webm'];
@@ -145,7 +148,6 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
           onAdBlockingToggle: () {
             final currentEnabled = ref.read(adBlockEnabledProvider);
             ref.read(adBlockEnabledProvider.notifier).setEnabled(!currentEnabled);
-            // 这里不需要手动调 _initializePlayer，因为下面 build 里的 watch 会处理
           },
           skipConfig: widget.skipConfig ?? SkipConfig(),
           onSkipConfigChange: widget.onSkipConfigChange,
@@ -165,8 +167,13 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
       );
     } catch (e) {
       debugPrint('EchoVideoPlayer error: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().contains('404') ? '资源不存在 (404)' : '无法加载视频，请检查网络或更换线路';
+        });
+      }
     } finally {
-      if (!_isDisposed) {
+      if (!_isDisposed && mounted) {
         setState(() => _isInitializing = false);
       }
     }
@@ -239,6 +246,28 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
         _initializePlayer();
       }
     });
+
+    if (_errorMessage != null || (_videoController?.value.hasError ?? false)) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white54, size: 42),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? '播放失败: ${widget.title}',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _initializePlayer,
+              child: const Text('重试', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (_isInitializing || _chewieController == null || !_videoController!.value.isInitialized) {
       return const Center(

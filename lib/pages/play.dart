@@ -18,33 +18,39 @@ class _PlayPageState extends ConsumerState<PlayPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Center(
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: EchoVideoPlayer(
-                key: _playerKey,
-                url: widget.videoUrl,
-                title: widget.title,
-                isLive: true,
-                referer: widget.videoUrl.startsWith('http') ? Uri.parse(widget.videoUrl).origin : '',
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            Center(
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: EchoVideoPlayer(
+                  key: _playerKey,
+                  url: widget.videoUrl,
+                  title: widget.title,
+                  isLive: true,
+                  referer: widget.videoUrl.startsWith('http') ? Uri.parse(widget.videoUrl).origin : '',
+                ),
               ),
             ),
-          ),
-          
-          // Back button - 采用与点播页一致的简洁风格
-          Positioned(
-            top: 40,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(LucideIcons.chevronLeft, size: 28, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
+            
+            // Back button - 采用与点播页一致的简洁风格
+            Positioned(
+              top: 40,
+              left: 20,
+              child: IconButton(
+                icon: const Icon(LucideIcons.chevronLeft, size: 28, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

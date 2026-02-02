@@ -46,6 +46,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   bool _isSearching = true;
   bool _isDetailLoading = true;
   bool _isOptimizing = false;
+  bool _noSitesConfigured = false;
   LoadingStage _loadingStage = LoadingStage.searching;
   String _loadingMessage = '🔍 正在搜索播放源...';
 
@@ -159,8 +160,24 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     }
 
     final sites = await configService.getSites();
+    final activeSites = sites.where((s) => !s.disabled).toList();
 
-    await for (final results in cmsService.searchAllStream(sites, widget.subject.title)) {
+    if (activeSites.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _noSitesConfigured = true;
+          _loadingMessage = '❌ 未配置有效视频源';
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _noSitesConfigured = false;
+    });
+
+    await for (final results in cmsService.searchAllStream(activeSites, widget.subject.title)) {
       if (!mounted) break;
 
       final List<VideoDetail> filtered = [];
@@ -479,8 +496,10 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(color: Colors.white),
-                const SizedBox(height: 16),
+                if (_isSearching) ...[
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: 16),
+                ],
                 Text(
                   _loadingMessage,
                   style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
@@ -684,7 +703,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       if (_isSearching) {
         return const Center(child: CircularProgressIndicator(strokeWidth: 2));
       }
-      return const Center(child: Text('暂无资源'));
+      return Center(child: Text(_noSitesConfigured ? '未配置有效视频源' : '暂无资源'));
     }
     
     final group = _currentSource!.playGroups.first;
@@ -804,7 +823,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   Widget _buildSourceTab(ThemeData theme) {
     if (_availableSources.isEmpty && _isSearching) return const Center(child: CircularProgressIndicator());
-    if (_availableSources.isEmpty) return const Center(child: Text('未搜到资源'));
+    if (_availableSources.isEmpty) return Center(child: Text(_noSitesConfigured ? '未配置有效视频源' : '未搜到资源'));
     String statusText = '源站优选已完成';
     if (_isSearching) {
       statusText = '正在全网搜索源站...';

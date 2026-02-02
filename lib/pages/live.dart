@@ -49,9 +49,11 @@ class _LivePageState extends ConsumerState<LivePage> {
         _channels = channels;
         _isLoading = false;
         _selectedSource = source;
-        // 默认播放第一个频道
-        if (channels.isNotEmpty && _currentChannel == null) {
+        // 优化：切换源后自动选中并播放新源的第一个频道
+        if (channels.isNotEmpty) {
           _currentChannel = channels.first;
+        } else {
+          _currentChannel = null;
         }
       });
     }
@@ -63,41 +65,112 @@ class _LivePageState extends ConsumerState<LivePage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isPC = screenWidth > 960;
 
-    return ZenScaffold(
-      body: isPC ? _buildPCLayout(theme) : _buildMobileLayout(theme),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+      },
+      child: ZenScaffold(
+        body: CustomScrollView(
+          physics: const NeverScrollableScrollPhysics(), // 直播页内部自滚动，防止双滚动条
+          slivers: [
+            ZenSliverAppBar(
+              title: '电视直播',
+              subtitle: _selectedSource?.name ?? '全球高清直播频道',
+              actions: [
+                if (_sources.length > 1)
+                  PopupMenuButton<LiveSource>(
+                    icon: const Icon(LucideIcons.listVideo, size: 20),
+                    onSelected: _loadChannels,
+                    tooltip: '切换直播源',
+                    itemBuilder: (context) => _sources.map((s) => PopupMenuItem(
+                      value: s,
+                      child: Text(s.name, style: const TextStyle(fontSize: 13)),
+                    )).toList(),
+                  ),
+              ],
+            ),
+            SliverFillRemaining(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isPC ? 48 : 16, 
+                  0, 
+                  isPC ? 48 : 16, 
+                  isPC ? 48 : 16
+                ),
+                child: isPC ? _buildPCLayout(theme) : _buildMobileLayout(theme),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildPCLayout(ThemeData theme) {
-    return Row(
-      children: [
-        // 左侧播放区域
-        Expanded(
-          flex: 7,
-          child: Container(
-            color: Colors.black,
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          // 左侧播放区域
+          Expanded(
+            flex: 7,
+            child: Container(
+              color: Colors.black,
+              child: _buildPlayer(),
+            ),
+          ),
+          // 右侧列表区域
+          Container(
+            width: 350,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(left: BorderSide(color: theme.dividerColor)),
+            ),
             child: Column(
               children: [
-                _buildHeader(theme, true),
-                Expanded(
-                  child: Center(
-                    child: _buildPlayer(),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: theme.dividerColor)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.tv, size: 18, color: theme.colorScheme.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _currentChannel?.name ?? '选择频道',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${_channels.length} 频道',
+                        style: TextStyle(fontSize: 11, color: theme.colorScheme.secondary),
+                      ),
+                    ],
                   ),
                 ),
+                Expanded(child: _buildChannelList(theme)),
               ],
             ),
           ),
-        ),
-        // 右侧列表区域
-        Container(
-          width: 350,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            border: Border(left: BorderSide(color: theme.dividerColor)),
-          ),
-          child: _buildChannelList(theme),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -106,65 +179,30 @@ class _LivePageState extends ConsumerState<LivePage> {
       children: [
         // 上方播放器
         Container(
-          color: Colors.black,
-          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: AspectRatio(
             aspectRatio: 16 / 9,
             child: _buildPlayer(),
           ),
         ),
-        // 下方标题和列表
+        const SizedBox(height: 16),
+        // 下方列表
         Expanded(
-          child: Column(
-            children: [
-              _buildHeader(theme, false),
-              Expanded(child: _buildChannelList(theme)),
-            ],
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.dividerColor),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: _buildChannelList(theme),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildHeader(ThemeData theme, bool isPC) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        children: [
-          if (!isPC)
-            IconButton(
-              icon: const Icon(LucideIcons.chevronLeft),
-              onPressed: () => Navigator.pop(context),
-            ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _currentChannel?.name ?? '电视直播',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  _selectedSource?.name ?? '未选择源',
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.secondary),
-                ),
-              ],
-            ),
-          ),
-          if (_sources.length > 1)
-            PopupMenuButton<LiveSource>(
-              icon: const Icon(LucideIcons.listVideo),
-              onSelected: _loadChannels,
-              itemBuilder: (context) => _sources.map((s) => PopupMenuItem(
-                value: s,
-                child: Text(s.name),
-              )).toList(),
-            ),
-        ],
-      ),
     );
   }
 

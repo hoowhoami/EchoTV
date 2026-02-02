@@ -27,6 +27,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   
   bool _isLoading = false;
   bool _isSearching = false;
+  bool _noSitesConfigured = false;
 
   @override
   void initState() {
@@ -38,6 +39,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           _isSearching = false;
           _results = [];
           _aggregatedResults = {};
+          _noSitesConfigured = false;
         });
       }
     });
@@ -91,6 +93,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       _isLoading = true;
       _isSearching = true;
       _results = [];
+      _noSitesConfigured = false;
     });
 
     _saveHistory(searchText);
@@ -98,8 +101,19 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final cmsService = ref.read(cmsServiceProvider);
     final configService = ref.read(configServiceProvider);
     final sites = await configService.getSites();
+    final activeSites = sites.where((s) => !s.disabled).toList();
 
-    await for (final allResults in cmsService.searchAllStream(sites, searchText)) {
+    if (activeSites.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _noSitesConfigured = true;
+        });
+      }
+      return;
+    }
+
+    await for (final allResults in cmsService.searchAllStream(activeSites, searchText)) {
       if (!mounted) break;
       final filteredResults = _filterAndSortResults(allResults, searchText);
       
@@ -464,9 +478,16 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         padding: const EdgeInsets.only(top: 100),
         child: Column(
           children: [
-            Icon(LucideIcons.searchX, size: 48, color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
+            Icon(
+              _noSitesConfigured ? LucideIcons.alertCircle : LucideIcons.searchX, 
+              size: 48, 
+              color: theme.colorScheme.secondary.withValues(alpha: 0.3)
+            ),
             const SizedBox(height: 16),
-            Text('未搜到匹配资源', style: TextStyle(color: theme.colorScheme.secondary)),
+            Text(
+              _noSitesConfigured ? '未配置有效视频源' : '未搜到匹配资源', 
+              style: TextStyle(color: theme.colorScheme.secondary)
+            ),
           ],
         ),
       ),
