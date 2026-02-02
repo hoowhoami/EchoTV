@@ -224,8 +224,8 @@ class AdBlockService {
             // 判定逻辑 A: 显式黑名单 (最高优先级)
             for (var kw in adKeywords) {
               if (absoluteUrl.toLowerCase().contains(kw)) {
-                // 特殊处理：如果是 'ads' 这种通用词，且分片域名与主站一致，则不判定为广告
-                if (kw == 'ads' && (segmentRootHost == mainRootHost || segmentUri.host.contains(baseUri.host))) {
+                // 核心优化：如果分片域名与主站一致，信任该资源，忽略所有黑名单关键词
+                if (segmentRootHost == mainRootHost || segmentUri.host.contains(baseUri.host)) {
                   continue;
                 }
                 isAd = true;
