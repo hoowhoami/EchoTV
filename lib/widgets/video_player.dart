@@ -46,6 +46,7 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
   ChewieController? _chewieController;
   bool _isInitializing = false;
   bool _isDisposed = false;
+  Timer? _bufferingTimer;
   String? _errorMessage;
 
   @override
@@ -184,6 +185,28 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
     
     final value = _videoController!.value;
     
+    // 监听缓冲状态（通用逻辑）
+    if (value.isInitialized && value.isBuffering && !_isInitializing) {
+      _bufferingTimer ??= Timer(const Duration(seconds: 15), () { // 点播宽限到 15s
+        if (mounted && _videoController!.value.isBuffering) {
+          setState(() {
+            _errorMessage = '网络连接不稳定或资源加载失败';
+          });
+        }
+      });
+    } else {
+      _bufferingTimer?.cancel();
+      _bufferingTimer = null;
+    }
+
+    // 监听视频尺寸异常（通用逻辑：初始化完成但无有效画面数据）
+    if (value.isInitialized && !value.isBuffering && value.size.width == 0) {
+      // 排除掉纯音频流的情况（如果业务不需要显示纯音频，这里统一视为源异常）
+      setState(() {
+        _errorMessage = '无法解析视频画面，请尝试切换线路';
+      });
+    }
+
     // 进度回调
     if (widget.onProgress != null && value.isPlaying) {
       widget.onProgress!(value.position);
@@ -222,6 +245,7 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
   @override
   void dispose() {
     _isDisposed = true;
+    _bufferingTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _videoController?.removeListener(_videoListener);
     _videoController?.dispose();
