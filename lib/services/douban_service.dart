@@ -228,4 +228,27 @@ class DoubanService {
       return [];
     }
   }
+
+  Future<List<DoubanSubject>> search(String query) async {
+    try {
+      final baseUrl = await getDoubanBase('m');
+      final response = await _dio.get('$baseUrl/rexxar/api/v2/search/subjects', queryParameters: {
+        'q': query,
+        'start': 0,
+        'count': 20,
+      });
+
+      Map<String, dynamic> data;
+      if (response.data is String) {
+        data = jsonDecode(response.data);
+      } else {
+        data = Map<String, dynamic>.from(response.data);
+      }
+
+      final items = data['items'] as List;
+      return items.where((i) => i['type'] == 'movie' || i['type'] == 'tv').map((s) => DoubanSubject.fromJson(s)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
 }

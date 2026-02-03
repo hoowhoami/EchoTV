@@ -1,25 +1,17 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/movie.dart';
 import '../models/site.dart';
 import '../services/cms_service.dart';
 import '../services/douban_service.dart';
 import '../services/config_service.dart';
 import '../providers/history_provider.dart';
-import '../providers/settings_provider.dart';
 import '../services/video_quality_service.dart';
-import '../services/ad_block_service.dart';
 import '../services/source_optimizer_service.dart';
 import '../widgets/cover_image.dart';
-import '../widgets/video_controls.dart';
 import '../widgets/zen_ui.dart';
 import '../widgets/video_player.dart';
 
@@ -34,64 +26,52 @@ class VideoDetailPage extends ConsumerStatefulWidget {
 
 enum LoadingStage { searching, preferring, fetching, ready }
 
-class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  DoubanSubject? _fullSubject;
+class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with WidgetsBindingObserver, TickerProviderStateMixin {
   late TabController _tabController;
-  late String _doubanId;
-
+  late HistoryNotifier _historyNotifier;
+  
+  DoubanSubject? _fullSubject;
+  bool _isDetailLoading = true;
+  String _doubanId = '';
+  
+  // 核心数据
   List<VideoDetail> _availableSources = [];
   VideoDetail? _currentSource;
   int _currentEpisodeIndex = 0;
   double? _initialResumePosition;
-  bool _isSearching = true;
-  bool _isDetailLoading = true;
-  bool _isOptimizing = false;
-  bool _noSitesConfigured = false;
-  LoadingStage _loadingStage = LoadingStage.searching;
-  String _loadingMessage = '🔍 正在搜索播放源...';
-
-  bool _isPlaying = false;
   bool _autoPlayNext = true;
-
-  final GlobalKey _playerKey = GlobalKey();
-
-  final Map<String, VideoQualityInfo> _qualityInfoMap = {};
-  final Map<String, double> _scoreMap = {};
-  final Set<String> _testedSources = {};
-
-  bool _descending = false;
-  bool _isEpisodeSelectorCollapsed = false;
-  
-  // Skip Config
   SkipConfig _skipConfig = SkipConfig();
 
-  // 移除 Timer，改用状态位控制
+  // 状态跟踪
+  LoadingStage _loadingStage = LoadingStage.searching;
+  String _loadingMessage = '';
+  bool _isSearching = true;
+  bool _isPlaying = false;
+  bool _noSitesConfigured = false;
+  bool _isOptimizing = false;
   bool _hasTriggeredInitialInit = false;
+  bool _descending = false;
+  bool _isEpisodeSelectorCollapsed = false;
+
+  Map<String, double> _scoreMap = {};
+  Map<String, VideoQualityInfo> _qualityInfoMap = {};
+  final Set<String> _testedSources = {};
+  
+  final GlobalKey<EchoVideoPlayerState> _playerKey = GlobalKey<EchoVideoPlayerState>();
 
   @override
   void initState() {
     super.initState();
-    _doubanId = widget.subject.id;
-    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addObserver(this);
+    _doubanId = widget.subject.id;
     _checkHistoryAndLoadData();
-    WakelockPlus.enable();
   }
 
-  void _loadSkipConfig() async {
-    if (_currentSource == null) return;
-    final configService = ref.read(configServiceProvider);
-    final key = '${_currentSource!.source}-${_currentSource!.id}';
-    final configs = await configService.getSkipConfigs();
-    if (configs.containsKey(key)) {
-      setState(() {
-        _skipConfig = configs[key]!;
-      });
-    } else {
-      setState(() {
-        _skipConfig = SkipConfig();
-      });
-    }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _historyNotifier = ref.read(historyProvider.notifier);
   }
 
   void _checkHistoryAndLoadData() async {
@@ -138,6 +118,24 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       _loadingMessage = '🔍 正在搜索播放源...';
     });
 
+    // 如果没有豆瓣 ID，尝试根据标题搜索一个
+    if (_doubanId.isEmpty) {
+      try {
+        final searchResults = await doubanService.search(widget.subject.title);
+        if (searchResults.isNotEmpty) {
+          final targetTitle = widget.subject.title.replaceAll(' ', '').toLowerCase();
+          final bestMatch = searchResults.firstWhere(
+            (s) => s.title.replaceAll(' ', '').toLowerCase() == targetTitle,
+            orElse: () => searchResults.first,
+          );
+          _doubanId = bestMatch.id;
+          debugPrint('🎬 通过搜索找到豆瓣 ID: $_doubanId');
+        }
+      } catch (e) {
+        debugPrint('❌ 搜索豆瓣 ID 失败: $e');
+      }
+    }
+
     if (_doubanId.isNotEmpty) {
       doubanService.getDetail(_doubanId).then((val) {
         if (val == null) {
@@ -147,7 +145,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         }
         if (mounted) {
           setState(() {
-            _fullSubject = val ?? widget.subject;
+            _fullSubject = val;
             _isDetailLoading = false;
           });
         }
@@ -260,7 +258,6 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         
         _loadSkipConfig();
         _handlePlayAction(_currentEpisodeIndex, resumePosition: _initialResumePosition);
-        _initialResumePosition = null;
       }
     }
   }
@@ -313,8 +310,9 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
   void _handlePlayAction(int index, {double? resumePosition}) {
     if (_currentSource == null) return;
-    _initialResumePosition = resumePosition;
     setState(() {
+      // 如果外部传入了 resumePosition 则使用，否则尝试沿用之前的（用于自动恢复）
+      _initialResumePosition = resumePosition ?? _initialResumePosition;
       _currentEpisodeIndex = index;
     });
   }
@@ -332,19 +330,30 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     _handlePlayAction(targetIndex);
   }
 
-  Future<void> _fetchFullDetail(VideoDetail source) async {
+  void _loadSkipConfig() async {
+    if (_currentSource == null) return;
+    final key = '${_currentSource!.source}-${_currentSource!.id}';
+    final config = await ref.read(configServiceProvider).getSkipConfigs();
+    if (mounted && config.containsKey(key)) {
+      setState(() {
+        _skipConfig = config[key]!;
+      });
+    }
+  }
+
+  Future<void> _fetchFullDetail(VideoDetail partial) async {
     try {
       final cmsService = ref.read(cmsServiceProvider);
       final configService = ref.read(configServiceProvider);
       final activeSites = await configService.getSites();
-      final site = activeSites.firstWhere((s) => s.key == source.source);
+      final site = activeSites.firstWhere((s) => s.key == partial.source);
       
-      final fullDetail = await cmsService.getDetail(site, source.id);
-      if (fullDetail != null && mounted && _currentSource?.id == source.id) {
+      final fullDetail = await cmsService.getDetail(site, partial.id);
+      if (fullDetail != null && mounted && _currentSource?.id == partial.id) {
         setState(() {
           _currentSource = fullDetail;
           // 同步更新缓存列表
-          final idx = _availableSources.indexWhere((s) => s.id == source.id && s.source == source.source);
+          final idx = _availableSources.indexWhere((s) => s.id == partial.id && s.source == partial.source);
           if (idx != -1) _availableSources[idx] = fullDetail;
         });
       }
@@ -359,11 +368,15 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
     }
   }
 
-  Future<void> _savePlayRecord(Duration position, Duration duration) async {
-    if (_currentSource == null) return;
-    // 每 5 秒保存一次
-    if (position.inSeconds % 5 != 0) return;
+  Future<void> _savePlayRecord(Duration position, Duration duration, {bool isFinal = false}) async {
+    if (_currentSource == null || !mounted) return;
     
+    // 只有在进度有实际变化（大于0）或者为了保存最后进度时才记录
+    if (position.inSeconds == 0 && duration.inSeconds == 0) return;
+
+    // 如果不是强制保存（isFinal），则每 10 秒保存一次
+    if (!isFinal && position.inSeconds % 10 != 0) return;
+
     final record = PlayRecord(
       title: widget.subject.title,
       sourceName: _currentSource!.sourceName,
@@ -372,12 +385,18 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
       index: _currentEpisodeIndex,
       totalEpisodes: _currentSource!.playGroups.first.urls.length,
       playTime: position.inSeconds,
-      totalTime: duration.inSeconds,
+      totalTime: duration.inSeconds > 0 ? duration.inSeconds : (_initialResumePosition?.toInt() ?? 0),
       saveTime: DateTime.now().millisecondsSinceEpoch,
       searchTitle: widget.subject.title,
       doubanId: _doubanId,
     );
-    ref.read(historyProvider.notifier).saveRecord(record);
+    try {
+      Future.microtask(() {
+        _historyNotifier.saveRecord(record);
+      });
+    } catch (e) {
+      debugPrint('保存历史记录失败: $e');
+    }
   }
 
   @override
@@ -537,7 +556,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
         },
         hasNextEpisode: _currentEpisodeIndex < _currentSource!.playGroups.first.urls.length - 1,
         onNextEpisode: _playNextEpisode,
-        onProgress: (pos) => _savePlayRecord(pos, const Duration(seconds: 0)), // duration 在 savePlayRecord 内部暂不使用或由 player 处理
+        onProgress: (pos, dur, {isFinal = false}) => _savePlayRecord(pos, dur, isFinal: isFinal),
         onEnded: _autoPlayNext ? _playNextEpisode : null,
       );
     }
@@ -598,7 +617,12 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
             children: [
               Row(children: [
                 Expanded(child: Text(widget.subject.title, style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w900, fontSize: isPC ? 32 : 24))),
-                if (widget.subject.rate.isNotEmpty) Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Text('⭐ ${widget.subject.rate}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14))),
+                if ((_fullSubject?.rate ?? widget.subject.rate).isNotEmpty && (_fullSubject?.rate ?? widget.subject.rate) != '0.0') 
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), 
+                    decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), 
+                    child: Text('⭐ ${_fullSubject?.rate ?? widget.subject.rate}', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14))
+                  ),
               ]),
               const SizedBox(height: 16),
               Wrap(spacing: 12, runSpacing: 8, children: [
@@ -633,9 +657,11 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
   }
 
   Widget _buildDescriptionSection(ThemeData theme) {
-    if (_fullSubject?.description != null && _fullSubject!.description!.isNotEmpty) {
+    final String? description = _fullSubject?.description ?? widget.subject.description;
+    
+    if (description != null && description.isNotEmpty) {
       return Text(
-        _fullSubject!.description!, 
+        description, 
         style: theme.textTheme.bodyLarge?.copyWith(
           color: theme.colorScheme.onSurface.withValues(alpha: 0.7), 
           height: 1.8, 
@@ -646,30 +672,13 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with SingleTi
 
     if (!_isDetailLoading) {
        return Text(
-        '暂无详情介绍', 
-        style: theme.textTheme.bodyLarge?.copyWith(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.4), 
-          fontSize: 14,
-          fontStyle: FontStyle.italic
-        )
+        '暂无详情介绍',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
       );
     }
-
-    // 骨架屏占位
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(3, (i) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Container(
-          width: i == 2 ? 200 : double.infinity,
-          height: 14,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      )),
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildInfoBadge(String text, ThemeData theme, {bool isAccent = false, VoidCallback? onTap}) {

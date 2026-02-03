@@ -19,7 +19,7 @@ class EchoVideoPlayer extends ConsumerStatefulWidget {
   final Function(SkipConfig)? onSkipConfigChange;
   final VoidCallback? onNextEpisode;
   final bool hasNextEpisode;
-  final Function(Duration)? onProgress;
+  final Function(Duration position, Duration duration, {bool isFinal})? onProgress;
   final VoidCallback? onEnded;
 
   const EchoVideoPlayer({
@@ -38,10 +38,10 @@ class EchoVideoPlayer extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<EchoVideoPlayer> createState() => _EchoVideoPlayerState();
+  ConsumerState<EchoVideoPlayer> createState() => EchoVideoPlayerState();
 }
 
-class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _isInitializing = false;
@@ -125,9 +125,15 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
       await controller.initialize();
       if (_isDisposed) return;
 
-      // 如果有初始进度，跳转
+      // 如果有初始进度，计算跳转位置
+      Duration? startAt;
       if (widget.initialPosition != null && widget.initialPosition! > 0) {
-        await controller.seekTo(Duration(seconds: widget.initialPosition!.toInt()));
+        final seconds = widget.initialPosition!.toInt();
+        // 只有当进度小于总时长（或者总时长还未获取到）时才跳转
+        if (controller.value.duration == Duration.zero || seconds < controller.value.duration.inSeconds) {
+          startAt = Duration(seconds: seconds);
+          debugPrint('🎬 播放器准备跳转至: ${seconds}s');
+        }
       }
 
       // 设置音量
@@ -141,6 +147,7 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
         videoPlayerController: controller,
         autoPlay: true,
         looping: false,
+        startAt: startAt,
         aspectRatio: controller.value.aspectRatio,
         allowFullScreen: true,
         isLive: widget.isLive,
@@ -160,8 +167,8 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
           onNextEpisode: widget.onNextEpisode,
         ),
         materialProgressColors: ChewieProgressColors(
-          playedColor: widget.isLive ? Colors.white : Theme.of(context).primaryColor,
-          handleColor: widget.isLive ? Colors.white : Theme.of(context).primaryColor,
+          playedColor: widget.isLive ? Colors.white : const Color(0xFF0A84FF),
+          handleColor: widget.isLive ? Colors.white : const Color(0xFF0A84FF),
           bufferedColor: Colors.white.withOpacity(0.3),
           backgroundColor: Colors.white.withOpacity(0.1),
         ),
@@ -208,8 +215,13 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
     }
 
     // 进度回调
+    // 进度回调 (每秒最多回调一次，且在播放时回调)
     if (widget.onProgress != null && value.isPlaying) {
-      widget.onProgress!(value.position);
+      final currentPos = value.position;
+      if (_lastProgressSaveTime == null || (currentPos.inSeconds != _lastProgressSaveTime!.inSeconds)) {
+        widget.onProgress!(currentPos, value.duration, isFinal: false);
+        _lastProgressSaveTime = currentPos;
+      }
     }
 
     // --- 新增：跳过片头片尾逻辑 ---
@@ -242,11 +254,22 @@ class _EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsB
     }
   }
 
+  Duration? _lastProgressSaveTime;
+
   @override
   void dispose() {
     _isDisposed = true;
     _bufferingTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    
+    // 销毁前保存最后进度
+    if (_videoController != null && widget.onProgress != null) {
+      final value = _videoController!.value;
+      if (value.isInitialized) {
+        widget.onProgress!(value.position, value.duration, isFinal: true);
+      }
+    }
+    
     _videoController?.removeListener(_videoListener);
     _videoController?.dispose();
     _chewieController?.dispose();

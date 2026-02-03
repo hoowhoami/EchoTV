@@ -464,7 +464,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 
   Widget _buildMovieCard(VideoDetail item, {String? badge}) {
-    final subject = DoubanSubject(id: item.id, title: item.title, rate: '0.0', cover: item.poster, year: item.year);
+    // ID 传空，让详情页自动匹配豆瓣 ID，避免 CMS ID 误导导致获取不到详情和评分
+    final subject = DoubanSubject(id: '', title: item.title, rate: '0.0', cover: item.poster, year: item.year);
     return MovieCard(
       movie: subject, 
       badge: badge,

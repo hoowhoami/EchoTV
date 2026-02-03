@@ -597,22 +597,6 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                       _chewieController?.enterFullScreen();
                     }
                   }),
-
-                  if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux))
-                    _buildIconBtn(LucideIcons.maximize, () async {
-                      bool isFullScreen = await windowManager.isFullScreen();
-                      if (!isFullScreen) {
-                        if (!(_chewieController?.isFullScreen ?? false)) {
-                          _chewieController?.enterFullScreen();
-                        }
-                        await windowManager.setFullScreen(true);
-                      } else {
-                        await windowManager.setFullScreen(false);
-                        if (_chewieController?.isFullScreen ?? false) {
-                          _chewieController?.exitFullScreen();
-                        }
-                      }
-                    }),
                 ],
               ],
             ),
