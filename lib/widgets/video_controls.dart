@@ -846,13 +846,13 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
             trackHeight: _isBarHovered ? 4.0 : 2.0,
             thumbShape: RoundSliderThumbShape(
               enabledThumbRadius: _isBarHovered ? 6.0 : 0.0,
-              elevation: 0,
-              pressedElevation: 0,
+              elevation: 2,
+              pressedElevation: 4,
             ),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 10.0),
-            activeTrackColor: Theme.of(context).primaryColor,
-            inactiveTrackColor: Colors.white.withOpacity(0.15),
-            thumbColor: Theme.of(context).primaryColor,
+            activeTrackColor: const Color(0xFF0A84FF),
+            inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
+            thumbColor: Colors.white,
             trackShape: const RectangularSliderTrackShape(),
           ),
           child: Slider(
