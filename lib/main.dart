@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'core/theme.dart';
 import 'pages/home.dart';
 import 'pages/explore.dart';
@@ -35,6 +36,28 @@ void main() async {
       await windowManager.show();
       await windowManager.focus();
     });
+    // 防止点击关闭按钮时退出应用
+    await windowManager.setPreventClose(true);
+
+    // 初始化系统托盘（仅 Windows 和 Linux）
+    if (Platform.isWindows || Platform.isLinux) {
+      await trayManager.setIcon('assets/icon/app_icon.png');
+      final Menu menu = Menu(
+        items: [
+          MenuItem(
+            key: 'show_window',
+            label: '显示窗口',
+          ),
+          MenuItem.separator(),
+          MenuItem(
+            key: 'exit_app',
+            label: '退出应用',
+          ),
+        ],
+      );
+      await trayManager.setContextMenu(menu);
+      await trayManager.setToolTip('EchoTV');
+    }
   }
 
   final container = ProviderContainer();
@@ -56,7 +79,7 @@ class EchoTVApp extends ConsumerStatefulWidget {
   ConsumerState<EchoTVApp> createState() => _EchoTVAppState();
 }
 
-class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener {
+class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener, TrayListener {
   bool get _isDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
   @override
@@ -64,6 +87,7 @@ class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener {
     super.initState();
     if (_isDesktop) {
       windowManager.addListener(this);
+      trayManager.addListener(this);
     }
   }
 
@@ -71,6 +95,7 @@ class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener {
   void dispose() {
     if (_isDesktop) {
       windowManager.removeListener(this);
+      trayManager.removeListener(this);
     }
     super.dispose();
   }
@@ -78,7 +103,33 @@ class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener {
   @override
   void onWindowClose() async {
     if (_isDesktop) {
-      await windowManager.hide();
+      bool isPreventClose = await windowManager.isPreventClose();
+      if (isPreventClose) {
+        await windowManager.hide();
+      }
+    }
+  }
+
+  @override
+  void onTrayIconMouseDown() {
+    windowManager.show();
+    windowManager.focus();
+  }
+
+  @override
+  void onTrayIconRightMouseDown() {
+    trayManager.popUpContextMenu();
+  }
+
+  @override
+  void onTrayMenuItemClick(MenuItem menuItem) async {
+    if (menuItem.key == 'show_window') {
+      await windowManager.show();
+      await windowManager.focus();
+    } else if (menuItem.key == 'exit_app') {
+      await windowManager.setPreventClose(false);
+      await windowManager.close();
+      exit(0);
     }
   }
 
