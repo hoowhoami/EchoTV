@@ -863,7 +863,6 @@ class _HoverableIcon extends StatefulWidget {
   final double size;
 
   const _HoverableIcon({
-    super.key,
     required this.icon,
     required this.onTap,
     this.size = 18,

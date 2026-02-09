@@ -62,7 +62,7 @@ class ZenSwitch extends StatelessWidget {
         child: Switch(
           value: value,
           onChanged: onChanged,
-        activeColor: theme.colorScheme.onPrimary,
+        activeThumbColor: theme.colorScheme.onPrimary,
         activeTrackColor: activeTrackColor ?? theme.colorScheme.primary,
         inactiveThumbColor: isDark ? Colors.white38 : Colors.white,
         inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,

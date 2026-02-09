@@ -35,7 +35,7 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with WidgetsB
   String _doubanId = '';
   
   // 核心数据
-  List<VideoDetail> _availableSources = [];
+  final List<VideoDetail> _availableSources = [];
   VideoDetail? _currentSource;
   int _currentEpisodeIndex = 0;
   double? _initialResumePosition;
@@ -46,15 +46,15 @@ class _VideoDetailPageState extends ConsumerState<VideoDetailPage> with WidgetsB
   LoadingStage _loadingStage = LoadingStage.searching;
   String _loadingMessage = '';
   bool _isSearching = true;
-  bool _isPlaying = false;
+  final bool _isPlaying = false;
   bool _noSitesConfigured = false;
   bool _isOptimizing = false;
   bool _hasTriggeredInitialInit = false;
   bool _descending = false;
   bool _isEpisodeSelectorCollapsed = false;
 
-  Map<String, double> _scoreMap = {};
-  Map<String, VideoQualityInfo> _qualityInfoMap = {};
+  final Map<String, double> _scoreMap = {};
+  final Map<String, VideoQualityInfo> _qualityInfoMap = {};
   final Set<String> _testedSources = {};
   
   final GlobalKey<EchoVideoPlayerState> _playerKey = GlobalKey<EchoVideoPlayerState>();
