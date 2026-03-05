@@ -1,5 +1,5 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ZenTheme {
   // --- 色彩系统 (iOS 17+ Style) ---
@@ -27,45 +27,98 @@ class ZenTheme {
   // --- 字体设置 ---
 
   static TextTheme _buildTextTheme(Color primaryColor, Color secondaryColor) {
-    final baseTheme = GoogleFonts.interTextTheme();
-    return baseTheme.copyWith(
-      displayLarge: GoogleFonts.inter(
-        fontWeight: FontWeight.w800,
-        color: primaryColor,
-        letterSpacing: -1.0,
-        fontSize: 32,
-      ),
-      displayMedium: GoogleFonts.inter(
-        fontWeight: FontWeight.w800,
-        color: primaryColor,
-        letterSpacing: -0.8,
-        fontSize: 24,
-      ),
-      titleLarge: GoogleFonts.inter(
-        fontWeight: FontWeight.bold,
-        color: primaryColor,
-        fontSize: 20,
-      ),
-      titleMedium: GoogleFonts.inter(
-        fontWeight: FontWeight.w600,
-        color: primaryColor,
-        fontSize: 16,
-      ),
-      bodyLarge: GoogleFonts.inter(
-        color: primaryColor,
-        fontSize: 15,
-      ),
-      bodyMedium: GoogleFonts.inter(
-        color: primaryColor.withValues(alpha: 0.8),
-        fontSize: 14,
-      ),
-      labelMedium: GoogleFonts.inter(
-        color: secondaryColor,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
-        fontSize: 12,
-      ),
-    );
+    final isMacOS = Platform.isMacOS;
+    final isIOS = Platform.isIOS;
+    final useSystemFont = isMacOS || isIOS;
+    
+    if (useSystemFont) {
+      // macOS/iOS 使用系统默认字体
+      return TextTheme(
+        displayLarge: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: primaryColor,
+          letterSpacing: -1.0,
+          fontSize: 32,
+        ),
+        displayMedium: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: primaryColor,
+          letterSpacing: -0.8,
+          fontSize: 24,
+        ),
+        titleLarge: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: primaryColor,
+          fontSize: 20,
+        ),
+        titleMedium: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: primaryColor,
+          fontSize: 16,
+        ),
+        bodyLarge: TextStyle(
+          color: primaryColor,
+          fontSize: 15,
+        ),
+        bodyMedium: TextStyle(
+          color: primaryColor.withValues(alpha: 0.8),
+          fontSize: 14,
+        ),
+        labelMedium: TextStyle(
+          color: secondaryColor,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          fontSize: 12,
+        ),
+      );
+    } else {
+      // Windows/Linux/Android 使用 MiSans
+      return TextTheme(
+        displayLarge: TextStyle(
+          fontFamily: 'MiSans',
+          fontWeight: FontWeight.w800,
+          color: primaryColor,
+          letterSpacing: -1.0,
+          fontSize: 32,
+        ),
+        displayMedium: TextStyle(
+          fontFamily: 'MiSans',
+          fontWeight: FontWeight.w800,
+          color: primaryColor,
+          letterSpacing: -0.8,
+          fontSize: 24,
+        ),
+        titleLarge: TextStyle(
+          fontFamily: 'MiSans',
+          fontWeight: FontWeight.bold,
+          color: primaryColor,
+          fontSize: 20,
+        ),
+        titleMedium: TextStyle(
+          fontFamily: 'MiSans',
+          fontWeight: FontWeight.w600,
+          color: primaryColor,
+          fontSize: 16,
+        ),
+        bodyLarge: TextStyle(
+          fontFamily: 'MiSans',
+          color: primaryColor,
+          fontSize: 15,
+        ),
+        bodyMedium: TextStyle(
+          fontFamily: 'MiSans',
+          color: primaryColor.withValues(alpha: 0.8),
+          fontSize: 14,
+        ),
+        labelMedium: TextStyle(
+          fontFamily: 'MiSans',
+          color: secondaryColor,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+          fontSize: 12,
+        ),
+      );
+    }
   }
 
   static ThemeData lightTheme() {
@@ -161,7 +214,7 @@ class ZenTheme {
           return null;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return accentBlue; // 深色模式下开启状态使用亮蓝色轨道，非常醒目
+          if (states.contains(WidgetState.selected)) return accentBlue;
           return null;
         }),
       ),

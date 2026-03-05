@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
+import 'package:flutter_single_instance/flutter_single_instance.dart';
+import 'package:path_provider/path_provider.dart';
 import 'core/theme.dart';
 import 'pages/home.dart';
 import 'pages/explore.dart';
@@ -23,41 +24,46 @@ import 'widgets/zen_ui.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    // windowManager.ensureInitialized() MUST be called before isFirstInstance()
+    // so that the secondary instance's window is hidden immediately on startup,
+    // preventing the ghost transparent window in the top-left corner of macOS.
     await windowManager.ensureInitialized();
+
+    // Set onFocus before isFirstInstance() to avoid a race where the gRPC server
+    // starts (inside isFirstInstance) but the callback is not yet registered.
+    FlutterSingleInstance.onFocus = (_) async {
+      if (await windowManager.isMinimized()) await windowManager.restore();
+      await windowManager.show();
+      await windowManager.focus();
+    };
+
+    if (Platform.isMacOS) {
+      // Ensure cache directory exists for FlutterSingleInstance PID file
+      final cacheDir = await getApplicationCacheDirectory();
+      if (!await cacheDir.exists()) {
+        await cacheDir.create(recursive: true);
+      }
+    }
+
+    final instance = FlutterSingleInstance();
+    if (!(await instance.isFirstInstance())) {
+      await instance.focus();
+      exit(0);
+    }
+
     WindowOptions windowOptions = const WindowOptions(
+      minimumSize: Size(1000, 700),
       size: Size(1280, 720),
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
-      titleBarStyle: TitleBarStyle.normal,
+      titleBarStyle: TitleBarStyle.hidden,
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
     });
-    // 防止点击关闭按钮时退出应用
-    await windowManager.setPreventClose(true);
-
-    // 初始化系统托盘（仅 Windows 和 Linux）
-    if (Platform.isWindows || Platform.isLinux) {
-      await trayManager.setIcon('assets/icon/app_icon.png');
-      final Menu menu = Menu(
-        items: [
-          MenuItem(
-            key: 'show_window',
-            label: '显示窗口',
-          ),
-          MenuItem.separator(),
-          MenuItem(
-            key: 'exit_app',
-            label: '退出应用',
-          ),
-        ],
-      );
-      await trayManager.setContextMenu(menu);
-      await trayManager.setToolTip('EchoTV');
-    }
   }
 
   final container = ProviderContainer();
@@ -79,17 +85,35 @@ class EchoTVApp extends ConsumerStatefulWidget {
   ConsumerState<EchoTVApp> createState() => _EchoTVAppState();
 }
 
+
 class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener, TrayListener {
-  bool get _isDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  bool get _isDesktop => Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
   @override
   void initState() {
     super.initState();
     if (_isDesktop) {
+      windowManager.setPreventClose(true);
       windowManager.addListener(this);
       trayManager.addListener(this);
+      _initTray();
     }
   }
+
+  Future<void> _initTray() async {
+    await trayManager.setIcon('assets/icon/app_icon.png');
+    await trayManager.setToolTip('EchoTV');
+    
+    final menu = Menu(
+      items: [
+        MenuItem(key: 'show_window', label: '显示窗口'),
+        MenuItem.separator(),
+        MenuItem(key: 'exit_app', label: '退出应用'),
+      ],
+    );
+    await trayManager.setContextMenu(menu);
+  }
+
 
   @override
   void dispose() {
@@ -110,6 +134,12 @@ class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener, Tray
     }
   }
 
+
+  @override
+  void onWindowRestore() async {
+    await windowManager.show();
+    await windowManager.focus();
+  }
   @override
   void onTrayIconMouseDown() {
     windowManager.show();
@@ -137,20 +167,11 @@ class _EchoTVAppState extends ConsumerState<EchoTVApp> with WindowListener, Tray
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModelProvider);
     
-    // 监听主题变化并更新桌面端窗口亮度
-    if (_isDesktop) {
-      Brightness brightness;
-      if (themeMode == ThemeMode.system) {
-        brightness = MediaQuery.platformBrightnessOf(context);
-      } else {
-        brightness = themeMode == ThemeMode.dark ? Brightness.dark : Brightness.light;
-      }
-      windowManager.setBrightness(brightness);
-    }
     
     return MaterialApp.router(
       title: 'EchoTV',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('zh', 'CN'),
       theme: ZenTheme.lightTheme(),
       darkTheme: ZenTheme.darkTheme(),
       themeMode: themeMode,
@@ -223,7 +244,7 @@ class _TermsGateState extends ConsumerState<TermsGate> {
               _buildTermsItem('3. 隐私声明', '我们不会收集您的个人隐私数据，您的配置信息仅存储在您的设备本地或您指定的云端。'),
               const SizedBox(height: 16),
               Text(
-                '点击“同意”即代表您已阅读并同意上述条款。若您不同意，请选择“退出应用”。',
+                '点击"同意"即代表您已阅读并同意上述条款。若您不同意，请选择"退出应用"。',
                 style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.secondary),
               ),
             ],
@@ -366,20 +387,9 @@ final _router = GoRouter(
   ],
 );
 
-/// 使用系统默认的过渡动画构建页面，这会应用我们在主题中定义的 PageTransitionsTheme
-
-/// 从而在 iOS/macOS 上获得 Cupertino 风格的滑动切换和左滑返回手势
-
 Page _buildPageWithPlatformTransition(GoRouterState state, Widget child) {
-
   return MaterialPage(
-
     key: state.pageKey,
-
     child: child,
-
   );
-
 }
-
-

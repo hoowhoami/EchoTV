@@ -14,7 +14,11 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
     if !flag {
       for window in sender.windows {
-        window.makeKeyAndOrderFront(self)
+        if window.contentViewController is FlutterViewController {
+          window.makeKeyAndOrderFront(self)
+          NSApp.activate(ignoringOtherApps: true)
+          break
+        }
       }
     }
     return true
